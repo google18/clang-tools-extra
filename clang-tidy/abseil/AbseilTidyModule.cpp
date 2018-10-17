@@ -12,6 +12,7 @@
 #include "../ClangTidyModuleRegistry.h"
 #include "DurationDivisionCheck.h"
 #include "FasterStrsplitDelimiterCheck.h"
+#include "MakeUniqueCheck.h"
 #include "NoInternalDependenciesCheck.h"
 #include "NoNamespaceCheck.h"
 #include "RedundantStrcatCallsCheck.h"
@@ -29,6 +30,8 @@ public:
         "abseil-duration-division");
     CheckFactories.registerCheck<FasterStrsplitDelimiterCheck>(
         "abseil-faster-strsplit-delimiter");
+    CheckFactories.registerCheck<MakeUniqueCheck>(
+        "abseil-make-unique");
     CheckFactories.registerCheck<NoInternalDependenciesCheck>(
         "abseil-no-internal-dependencies");
     CheckFactories.registerCheck<NoNamespaceCheck>("abseil-no-namespace");
