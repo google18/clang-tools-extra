@@ -18,18 +18,24 @@ namespace tidy {
 namespace abseil {
 
 void MakeUniqueCheck::registerMatchers(MatchFinder *Finder) {
-  // FIXME: Add matchers.
-  Finder->addMatcher(functionDecl().bind("x"), this);
+Finder->addMatcher(cxxConstructExpr(allOf(
+        hasType( cxxRecordDecl(hasName("std::unique_ptr"))),
+        hasArgument(0,cxxNewExpr()))).bind("x"),this);
+
+
+  Finder->addMatcher(cxxMemberCallExpr(allOf(
+        callee(cxxMethodDecl(
+             hasName("reset"),
+             ofClass(cxxRecordDecl(hasName("std::unique_ptr"), decl())))),
+        hasArgument(0, cxxNewExpr()))).bind("y"),this);
+
 }
 
 void MakeUniqueCheck::check(const MatchFinder::MatchResult &Result) {
   // FIXME: Add callback implementation.
-  const auto *MatchedDecl = Result.Nodes.getNodeAs<FunctionDecl>("x");
-  if (MatchedDecl->getName().startswith("awesome_"))
-    return;
-  diag(MatchedDecl->getLocation(), "function %0 is insufficiently awesome")
-      << MatchedDecl
-      << FixItHint::CreateInsertion(MatchedDecl->getLocation(), "awesome_");
+  const auto *MatchedDecl = Result.Nodes.getNodeAs<CXXConstructExpr>("x");
+  diag(MatchedDecl->getLocation(), "replace new with make_unique");
+
 }
 
 } // namespace abseil
