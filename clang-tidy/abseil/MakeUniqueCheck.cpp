@@ -18,24 +18,31 @@ namespace tidy {
 namespace abseil {
 
 void MakeUniqueCheck::registerMatchers(MatchFinder *Finder) {
-Finder->addMatcher(cxxConstructExpr(allOf(
+  Finder->addMatcher(cxxConstructExpr(
         hasType( cxxRecordDecl(hasName("std::unique_ptr"))),
-        hasArgument(0,cxxNewExpr()))).bind("x"),this);
+        argumentCountIs(1),
+        hasArgument(0,cxxNewExpr())).bind("x"),this);
+  
 
-
-  Finder->addMatcher(cxxMemberCallExpr(allOf(
+  Finder->addMatcher(cxxMemberCallExpr(
         callee(cxxMethodDecl(
              hasName("reset"),
-             ofClass(cxxRecordDecl(hasName("std::unique_ptr"), decl())))),
-        hasArgument(0, cxxNewExpr()))).bind("y"),this);
-
+             ofClass(cxxRecordDecl(hasName("std::unique_ptr"))))),
+        argumentCountIs(1),
+        hasArgument(0, cxxNewExpr())).bind("y"),this);
+  
 }
 
 void MakeUniqueCheck::check(const MatchFinder::MatchResult &Result) {
-  // FIXME: Add callback implementation.
-  const auto *MatchedDecl = Result.Nodes.getNodeAs<CXXConstructExpr>("x");
-  diag(MatchedDecl->getLocation(), "replace new with make_unique");
+  const auto *MatchedConstructor = Result.Nodes.getNodeAs<CXXConstructExpr>("x");
+  if (MatchedConstructor != nullptr) {
+    diag(MatchedConstructor->getLocation(), "replace new with absl::make_unique");
+  }
 
+  const auto *MatchedReset = Result.Nodes.getNodeAs<CXXMemberCallExpr>("y");
+  if (MatchedReset != nullptr) {  
+    diag(MatchedReset->getExprLoc(), "replace reset with absl::make_unique");
+  }
 }
 
 } // namespace abseil

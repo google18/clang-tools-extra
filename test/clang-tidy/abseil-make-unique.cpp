@@ -29,5 +29,5 @@ void Positives() {
 }
 
 void Negatives(){
-  std::unique_ptr<int> upi;
+
 }
