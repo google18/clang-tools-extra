@@ -67,6 +67,11 @@ The improvements are...
 Improvements to clang-tidy
 --------------------------
 
+- New :doc:`abseil-alias-free-headers
+  <clang-tidy/checks/abseil-alias-free-headers>` check.
+
+  FIXME: add release notes.
+
 - New :doc:`abseil-make-unique
   <clang-tidy/checks/abseil-make-unique>` check.
 

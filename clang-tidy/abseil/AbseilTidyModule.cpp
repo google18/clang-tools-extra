@@ -10,6 +10,7 @@
 #include "../ClangTidy.h"
 #include "../ClangTidyModule.h"
 #include "../ClangTidyModuleRegistry.h"
+#include "AliasFreeHeadersCheck.h"
 #include "DurationDivisionCheck.h"
 #include "FasterStrsplitDelimiterCheck.h"
 #include "MakeUniqueCheck.h"
@@ -26,6 +27,8 @@ namespace abseil {
 class AbseilModule : public ClangTidyModule {
 public:
   void addCheckFactories(ClangTidyCheckFactories &CheckFactories) override {
+    CheckFactories.registerCheck<AliasFreeHeadersCheck>(
+        "abseil-alias-free-headers");
     CheckFactories.registerCheck<DurationDivisionCheck>(
         "abseil-duration-division");
     CheckFactories.registerCheck<FasterStrsplitDelimiterCheck>(
