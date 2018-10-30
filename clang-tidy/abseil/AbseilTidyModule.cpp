@@ -17,6 +17,7 @@
 #include "NoInternalDependenciesCheck.h"
 #include "NoNamespaceCheck.h"
 #include "RedundantStrcatCallsCheck.h"
+#include "SafelyScopedAliasesCheck.h"
 #include "StringFindStartswithCheck.h"
 #include "StrCatAppendCheck.h"
 
@@ -40,6 +41,8 @@ public:
     CheckFactories.registerCheck<NoNamespaceCheck>("abseil-no-namespace");
     CheckFactories.registerCheck<RedundantStrcatCallsCheck>(
         "abseil-redundant-strcat-calls");
+    CheckFactories.registerCheck<SafelyScopedAliasesCheck>(
+        "abseil-safely-scoped-aliases");
     CheckFactories.registerCheck<StrCatAppendCheck>(
         "abseil-str-cat-append");
     CheckFactories.registerCheck<StringFindStartswithCheck>(

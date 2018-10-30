@@ -11,6 +11,7 @@ Clang-Tidy Checks
    abseil-no-internal-dependencies
    abseil-no-namespace
    abseil-redundant-strcat-calls
+   abseil-safely-scoped-aliases
    abseil-str-cat-append
    abseil-string-find-startswith
    android-cloexec-accept
