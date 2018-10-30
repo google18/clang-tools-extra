@@ -18,7 +18,6 @@ namespace tidy {
 namespace abseil {
 
 void AliasFreeHeadersCheck::registerMatchers(MatchFinder *Finder) {
-  // FIXME: Add matchers.
   Finder->addMatcher(usingDecl(isExpansionInFileMatching(".*\\.h.*")).bind("x"), this);
 }
 
