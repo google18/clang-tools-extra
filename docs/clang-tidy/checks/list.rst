@@ -10,6 +10,7 @@ Clang-Tidy Checks
    abseil-make-unique
    abseil-no-internal-dependencies
    abseil-no-namespace
+   abseil-qualified-aliases
    abseil-redundant-strcat-calls
    abseil-safely-scoped-aliases
    abseil-str-cat-append
