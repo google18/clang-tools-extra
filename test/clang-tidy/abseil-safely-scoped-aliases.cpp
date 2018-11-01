@@ -1,14 +1,29 @@
 // RUN: %check_clang_tidy %s abseil-safely-scoped-aliases %t
+namespace bar {
 
-// FIXME: Add something that triggers the check here.
-void f();
-// CHECK-MESSAGES: :[[@LINE-1]]:6: warning: function 'f' is insufficiently awesome [abseil-safely-scoped-aliases]
+class something {
+
+};
+}
+
+namespace foo {
+
+using bar::something;
+
+namespace {
+
+}  // anonymous namespace
+}  // namespace foo
+// CHECK-MESSAGES: :[[@LINE-6]]:12: warning: UsingDecl 'something' should be in the innermost scope [abseil-safely-scoped-aliases]
 
 // FIXME: Verify the applied fix.
-//   * Make the CHECK patterns specific enough and try to make verified lines
-//     unique to avoid incorrect matches.
-//   * Use {{}} for regular expressions.
-// CHECK-FIXES: {{^}}void awesome_f();{{$}}
 
 // FIXME: Add something that doesn't trigger the check here.
-void awesome_f2();
+namespace foo {
+
+namespace {
+
+using ::bar::something;
+
+}  // anonymous namespace
+}  // namespace foo
