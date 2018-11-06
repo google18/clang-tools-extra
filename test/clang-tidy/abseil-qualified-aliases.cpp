@@ -1,14 +1,19 @@
 // RUN: %check_clang_tidy %s abseil-qualified-aliases %t
 
-// FIXME: Add something that triggers the check here.
-void f();
-// CHECK-MESSAGES: :[[@LINE-1]]:6: warning: function 'f' is insufficiently awesome [abseil-qualified-aliases]
+namespace foo {
+  void f();
+  void correct();
+}
 
-// FIXME: Verify the applied fix.
+namespace bar {
+  using foo::f;
+// CHECK-MESSAGES: :[[@LINE-1]]:9: warning: using declaration is not fully qualified [abseil-qualified-aliases]
+  using ::foo::correct;
+// CHECK-MESSAGES: :[[@LINE-1]]:9: warning: using declaration is not fully qualified [abseil-qualified-aliases]
+}
+
 //   * Make the CHECK patterns specific enough and try to make verified lines
 //     unique to avoid incorrect matches.
 //   * Use {{}} for regular expressions.
-// CHECK-FIXES: {{^}}void awesome_f();{{$}}
+// CHECK-FIXES: {{^}}  using ::foo::f;{{$}}
 
-// FIXME: Add something that doesn't trigger the check here.
-void awesome_f2();
