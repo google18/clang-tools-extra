@@ -5,6 +5,7 @@ add_clang_library(clangTidyAbseilModule
   AliasFreeHeadersCheck.cpp
   AnonymousEnclosedAliasesCheck.cpp
   DurationDivisionCheck.cpp
+  DurationFactoryFloatCheck.cpp
   FasterStrsplitDelimiterCheck.cpp
   MakeUniqueCheck.cpp
   NoInternalDependenciesCheck.cpp
@@ -22,4 +23,5 @@ add_clang_library(clangTidyAbseilModule
   clangLex
   clangTidy
   clangTidyUtils
+  clangTooling
   )
