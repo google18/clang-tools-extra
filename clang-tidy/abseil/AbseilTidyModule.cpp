@@ -11,6 +11,7 @@
 #include "../ClangTidyModule.h"
 #include "../ClangTidyModuleRegistry.h"
 #include "AliasFreeHeadersCheck.h"
+#include "AnonymousEnclosedAliasesCheck.h"
 #include "DurationDivisionCheck.h"
 #include "FasterStrsplitDelimiterCheck.h"
 #include "MakeUniqueCheck.h"
@@ -31,6 +32,8 @@ public:
   void addCheckFactories(ClangTidyCheckFactories &CheckFactories) override {
     CheckFactories.registerCheck<AliasFreeHeadersCheck>(
         "abseil-alias-free-headers");
+    CheckFactories.registerCheck<AnonymousEnclosedAliasesCheck>(
+        "abseil-anonymous-enclosed-aliases");
     CheckFactories.registerCheck<DurationDivisionCheck>(
         "abseil-duration-division");
     CheckFactories.registerCheck<FasterStrsplitDelimiterCheck>(

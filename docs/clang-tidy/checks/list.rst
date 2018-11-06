@@ -5,6 +5,7 @@ Clang-Tidy Checks
 
 .. toctree::
    abseil-alias-free-headers
+   abseil-anonymous-enclosed-aliases
    abseil-duration-division
    abseil-faster-strsplit-delimiter
    abseil-make-unique

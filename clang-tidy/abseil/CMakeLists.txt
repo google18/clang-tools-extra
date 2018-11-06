@@ -3,6 +3,7 @@ set(LLVM_LINK_COMPONENTS support)
 add_clang_library(clangTidyAbseilModule
   AbseilTidyModule.cpp
   AliasFreeHeadersCheck.cpp
+  AnonymousEnclosedAliasesCheck.cpp
   DurationDivisionCheck.cpp
   FasterStrsplitDelimiterCheck.cpp
   MakeUniqueCheck.cpp
