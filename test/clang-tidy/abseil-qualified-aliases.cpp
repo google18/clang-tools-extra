@@ -9,7 +9,6 @@ namespace bar {
   using foo::f;
 // CHECK-MESSAGES: :[[@LINE-1]]:9: warning: using declaration is not fully qualified [abseil-qualified-aliases]
   using ::foo::correct;
-// CHECK-MESSAGES: :[[@LINE-1]]:9: warning: using declaration is not fully qualified [abseil-qualified-aliases]
 }
 
 //   * Make the CHECK patterns specific enough and try to make verified lines

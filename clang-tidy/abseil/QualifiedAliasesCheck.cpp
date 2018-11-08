@@ -28,13 +28,24 @@ void QualifiedAliasesCheck::check(const MatchFinder::MatchResult &Result) {
   // SourceLocation qualifierLoc = (MatchedDecl->getQualifierLoc()).getBeginLoc();
   // if ((fullDeclName->getAsIdentifier())->getName().startswith("::"))
   //   return;
+
+  // Obtain the location of the prefix
   const NestedNameSpecifierLoc qualifiedLoc = MatchedDecl->getQualifierLoc();
   const SourceLocation nameFrontLoc = qualifiedLoc.getBeginLoc();
-
-  const NestedNameSpecifier *nameFront = MatchedDecl->getQualifier();
-  const IdentifierInfo *nameFrontIdent = nameFront->getAsIdentifier();
-  if (MatchedDecl->getName().startswith("::"))
-    return;
+  
+  // Read the first two characters from the front location
+  const SourceManager *SM = Result.SourceManager;
+  CharSourceRange frontRange = CharSourceRange();
+  frontRange.setBegin(nameFrontLoc);
+  frontRange.setEnd(nameFrontLoc.getLocWithOffset(2));
+  llvm::StringRef ref = Lexer::getSourceText(frontRange, *SM, LangOptions());
+  
+  if (ref.startswith("::"))
+    return; 
+  // const NestedNameSpecifier *nameFront = MatchedDecl->getQualifier();
+  // const IdentifierInfo *nameFrontIdent = nameFront->getAsIdentifier();
+  // if (MatchedDecl->getName().startswith("::"))
+  //  return;
   diag(nameFrontLoc, "using declaration is not fully qualified") << FixItHint::CreateInsertion(nameFrontLoc, "::");
 }
 
