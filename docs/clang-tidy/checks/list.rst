@@ -4,13 +4,17 @@ Clang-Tidy Checks
 =================
 
 .. toctree::
+   abseil-alias-free-headers
+   abseil-anonymous-enclosed-aliases
    abseil-duration-division
    abseil-duration-factory-float
    abseil-faster-strsplit-delimiter
    abseil-make-unique
    abseil-no-internal-dependencies
    abseil-no-namespace
+   abseil-qualified-aliases
    abseil-redundant-strcat-calls
+   abseil-safely-scoped-aliases
    abseil-str-cat-append
    abseil-string-find-startswith
    android-cloexec-accept

@@ -10,13 +10,17 @@
 #include "../ClangTidy.h"
 #include "../ClangTidyModule.h"
 #include "../ClangTidyModuleRegistry.h"
+#include "AliasFreeHeadersCheck.h"
+#include "AnonymousEnclosedAliasesCheck.h"
 #include "DurationDivisionCheck.h"
 #include "DurationFactoryFloatCheck.h"
 #include "FasterStrsplitDelimiterCheck.h"
 #include "MakeUniqueCheck.h"
 #include "NoInternalDependenciesCheck.h"
 #include "NoNamespaceCheck.h"
+#include "QualifiedAliasesCheck.h"
 #include "RedundantStrcatCallsCheck.h"
+#include "SafelyScopedAliasesCheck.h"
 #include "StringFindStartswithCheck.h"
 #include "StrCatAppendCheck.h"
 
@@ -27,6 +31,10 @@ namespace abseil {
 class AbseilModule : public ClangTidyModule {
 public:
   void addCheckFactories(ClangTidyCheckFactories &CheckFactories) override {
+    CheckFactories.registerCheck<AliasFreeHeadersCheck>(
+        "abseil-alias-free-headers");
+    CheckFactories.registerCheck<AnonymousEnclosedAliasesCheck>(
+        "abseil-anonymous-enclosed-aliases");
     CheckFactories.registerCheck<DurationDivisionCheck>(
         "abseil-duration-division");
     CheckFactories.registerCheck<DurationFactoryFloatCheck>(
@@ -38,8 +46,12 @@ public:
     CheckFactories.registerCheck<NoInternalDependenciesCheck>(
         "abseil-no-internal-dependencies");
     CheckFactories.registerCheck<NoNamespaceCheck>("abseil-no-namespace");
+    CheckFactories.registerCheck<QualifiedAliasesCheck>(
+        "abseil-qualified-aliases");
     CheckFactories.registerCheck<RedundantStrcatCallsCheck>(
         "abseil-redundant-strcat-calls");
+    CheckFactories.registerCheck<SafelyScopedAliasesCheck>(
+        "abseil-safely-scoped-aliases");
     CheckFactories.registerCheck<StrCatAppendCheck>(
         "abseil-str-cat-append");
     CheckFactories.registerCheck<StringFindStartswithCheck>(
