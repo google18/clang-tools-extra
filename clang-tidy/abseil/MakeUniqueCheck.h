@@ -21,6 +21,10 @@ namespace abseil {
 /// For the user-facing documentation see:
 /// http://clang.llvm.org/extra/clang-tidy/checks/abseil-make-unique.html
 class MakeUniqueCheck : public ClangTidyCheck {
+private:
+  std::string getArgs(const SourceManager *SM, const CXXNewExpr *NewExpr);
+  std::string getType(const SourceManager *SM, const CXXNewExpr *NewExpr, const Expr *Outer);
+  
 public:
   MakeUniqueCheck(StringRef Name, ClangTidyContext *Context)
       : ClangTidyCheck(Name, Context) {}
