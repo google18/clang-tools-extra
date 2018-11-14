@@ -18,18 +18,13 @@ namespace tidy {
 namespace abseil {
 
 void AliasFreeHeadersCheck::registerMatchers(MatchFinder *Finder) {
-  // FIXME: Add matchers.
-  Finder->addMatcher(functionDecl().bind("x"), this);
+  // Match using declarations in header files.
+  Finder->addMatcher(usingDecl(isExpansionInFileMatching(".*\\.h.*")).bind("x"), this);
 }
 
 void AliasFreeHeadersCheck::check(const MatchFinder::MatchResult &Result) {
-  // FIXME: Add callback implementation.
-  const auto *MatchedDecl = Result.Nodes.getNodeAs<FunctionDecl>("x");
-  if (MatchedDecl->getName().startswith("awesome_"))
-    return;
-  diag(MatchedDecl->getLocation(), "function %0 is insufficiently awesome")
-      << MatchedDecl
-      << FixItHint::CreateInsertion(MatchedDecl->getLocation(), "awesome_");
+  const auto *MatchedDecl = Result.Nodes.getNodeAs<UsingDecl>("x");
+  diag(MatchedDecl->getLocation(), "convenience aliases in header files are dangerous");
 }
 
 } // namespace abseil
