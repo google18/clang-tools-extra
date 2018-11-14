@@ -7,7 +7,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <iostream>
 #include <string>
 #include "MakeUniqueCheck.h"
 #include "clang/AST/ASTContext.h"
@@ -19,11 +18,29 @@ namespace clang {
 namespace tidy {
 namespace abseil {
 
+std::string MakeUniqueCheck::getArgs(const SourceManager *SM,
+                                     const CXXNewExpr *NewExpr) {
+  llvm::StringRef ArgRef = Lexer::getSourceText(CharSourceRange::getCharRange(NewExpr->getDirectInitRange()), *SM, LangOptions());
+  return (ArgRef.str().length() > 0) ? ArgRef.str() + ")" : "()";
+}
+
+std::string MakeUniqueCheck::getType(const SourceManager *SM,
+                                     const CXXNewExpr *NewExpr,
+                                     const Expr *Outer) {
+  SourceRange TypeRange(NewExpr->getAllocatedTypeSourceInfo()->getTypeLoc().getBeginLoc(), NewExpr->getDirectInitRange().getBegin());
+  if (!TypeRange.isValid()) {
+    TypeRange.setEnd(Outer->getEndLoc());
+  }
+  llvm::StringRef TypeRef = Lexer::getSourceText(CharSourceRange::getCharRange(TypeRange), *SM, LangOptions());
+  return TypeRef.str();
+}
+
 void MakeUniqueCheck::registerMatchers(MatchFinder *Finder) {
-  Finder->addMatcher(declStmt(hasDescendant(cxxConstructExpr(
+  Finder->addMatcher(cxxConstructExpr(
         hasType(cxxRecordDecl(hasName("std::unique_ptr"))),
         argumentCountIs(1),
-        hasArgument(0, cxxNewExpr().bind("new"))).bind("construct"))).bind("decl"),this);
+        hasArgument(0, cxxNewExpr().bind("cons_new")),
+        anyOf(hasParent(decl().bind("cons_decl")), anything())).bind("cons"),this);
 
   Finder->addMatcher(cxxMemberCallExpr(
         callee(cxxMethodDecl(
@@ -34,35 +51,42 @@ void MakeUniqueCheck::registerMatchers(MatchFinder *Finder) {
 }
 
 void MakeUniqueCheck::check(const MatchFinder::MatchResult &Result) {
-  const auto *MatchedConstructor = Result.Nodes.getNodeAs<CXXConstructExpr>("construct");
-  const auto *NewExpr = Result.Nodes.getNodeAs<CXXNewExpr>("new");
-  const auto *Decl = Result.Nodes.getNodeAs<DeclStmt>("decl");
+  const SourceManager *SM = Result.SourceManager;
+  const auto *Cons = Result.Nodes.getNodeAs<CXXConstructExpr>("cons");
+  const auto *ConsNew = Result.Nodes.getNodeAs<CXXNewExpr>("cons_new");
+  const auto *ConsDecl = Result.Nodes.getNodeAs<Decl>("cons_decl");
   
-  if (MatchedConstructor) {
-    SourceRange argRange = NewExpr->getDirectInitRange();
-    const SourceManager *SM = Result.SourceManager;
-    llvm::StringRef ref = Lexer::getSourceText(CharSourceRange::getCharRange(argRange), *SM, LangOptions());
-    SourceRange nameRange(MatchedConstructor->getBeginLoc(), MatchedConstructor->getParenOrBraceRange().getBegin());
-    llvm::StringRef nameRef = Lexer::getSourceText(CharSourceRange::getCharRange(nameRange), *SM, LangOptions());
-    std::string NewText = "auto " + nameRef.str() + " = absl::make_unique<" + NewExpr->getAllocatedType().getAsString() + ">" + ref.str() + ")";
+  if (Cons) {
+    // Ignore list initialization constructors
+    if (ConsNew->getInitializationStyle() == CXXNewExpr::InitializationStyle::ListInit) {
+        return;
+    }
+   
+    // Get name of declared variable, if exists
+    llvm::StringRef NameRef = Lexer::getSourceText(CharSourceRange::getCharRange(Cons->getBeginLoc(), Cons->getParenOrBraceRange().getBegin()), *SM, LangOptions());
+    std::string Left = (ConsDecl) ? "auto " + NameRef.str() + " = " : "";
+   
+    std::string NewText = Left + "absl::make_unique<" + getType(SM, ConsNew, Cons) + ">" + getArgs(SM, ConsNew);
     
-    diag(Decl->getBeginLoc(), "prefer absl::make_unique to constructing unique_ptr with new") 
+    // If there is an associated Decl, start diagnostic there, otherwise use the beginning of the Expr   
+    SourceLocation Target = (ConsDecl) ? ConsDecl->getBeginLoc() : Cons->getExprLoc(); 
+    diag(Target, "prefer absl::make_unique to constructing unique_ptr with new") 
         << FixItHint::CreateReplacement(
-             CharSourceRange::getTokenRange(Decl->getBeginLoc(), argRange.getEnd().getLocWithOffset(1)), NewText);
+             CharSourceRange::getTokenRange(Target, Cons->getEndLoc()), NewText);
   }
 
-  const auto *MatchedReset = Result.Nodes.getNodeAs<CXXMemberCallExpr>("reset_call");
+  const auto *Reset = Result.Nodes.getNodeAs<CXXMemberCallExpr>("reset_call");
   const auto *ResetNew = Result.Nodes.getNodeAs<CXXNewExpr>("reset_new");
-  if (MatchedReset) {
-    const SourceManager *SM = Result.SourceManager;
-    const Expr *ObjectArg = MatchedReset->getImplicitObjectArgument();
-    llvm::StringRef objName = Lexer::getSourceText(CharSourceRange::getCharRange(ObjectArg->getBeginLoc(), MatchedReset->getExprLoc().getLocWithOffset(-1)), *SM, LangOptions());
-    SourceRange argRange = ResetNew->getDirectInitRange();
-    llvm::StringRef ref = Lexer::getSourceText(CharSourceRange::getCharRange(argRange), *SM, LangOptions());
-    std::string NewText = objName.str() + " = absl::make_unique<" + ResetNew->getAllocatedType().getAsString() + ">" + ref.str() + ")";
+  if (Reset) {
+    // Get name of caller object
+    const Expr *ObjectArg = Reset->getImplicitObjectArgument();
+    llvm::StringRef ObjName = Lexer::getSourceText(CharSourceRange::getCharRange(ObjectArg->getBeginLoc(), Reset->getExprLoc().getLocWithOffset(-1)), *SM, LangOptions());
+    
+    std::string NewText = ObjName.str() + " = absl::make_unique<" + getType(SM, ResetNew, Reset) + ">" + getArgs(SM, ResetNew);
+    
     diag(ObjectArg->getExprLoc(), "prefer absl::make_unique to resetting unique_ptr with new") 
         << FixItHint::CreateReplacement(
-             CharSourceRange::getTokenRange(ObjectArg->getEndLoc(), argRange.getEnd().getLocWithOffset(1)), NewText);
+             CharSourceRange::getTokenRange(ObjectArg->getExprLoc(), Reset->getEndLoc()), NewText);
   }
 }
 
