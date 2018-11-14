@@ -67,6 +67,26 @@ The improvements are...
 Improvements to clang-tidy
 --------------------------
 
+- New :doc:`abseil-safely-scoped
+  <clang-tidy/checks/abseil-safely-scoped>` check.
+
+  FIXME: add release notes.
+
+- New :doc:`abseil-qualified-aliases
+  <clang-tidy/checks/abseil-qualified-aliases>` check.
+
+  FIXME: add release notes.
+
+- New :doc:`abseil-anonymous-enclosed-aliases
+  <clang-tidy/checks/abseil-anonymous-enclosed-aliases>` check.
+
+  FIXME: add release notes.
+
+- New :doc:`abseil-alias-free-headers
+  <clang-tidy/checks/abseil-alias-free-headers>` check.
+
+  FIXME: add release notes.
+
 - New :doc:`abseil-duration-division
   <clang-tidy/checks/abseil-duration-division>` check.
 
