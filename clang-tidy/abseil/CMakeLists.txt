@@ -15,6 +15,7 @@ add_clang_library(clangTidyAbseilModule
   SafelyScopedAliasesCheck.cpp
   StrCatAppendCheck.cpp
   StringFindStartswithCheck.cpp
+  WrapUniqueCheck.cpp
 
   LINK_LIBS
   clangAST

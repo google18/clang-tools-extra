@@ -7,6 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <iostream>
 #include "WrapUniqueCheck.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
@@ -18,7 +19,7 @@ namespace tidy {
 namespace abseil {
 
 void WrapUniqueCheck::registerMatchers(MatchFinder *Finder) {
-  Finder->addMatcher(
+  Finder->addMatcher( 
   cxxMemberCallExpr(
     callee(cxxMethodDecl(
       hasName("reset"),
@@ -30,20 +31,26 @@ void WrapUniqueCheck::registerMatchers(MatchFinder *Finder) {
     has(callExpr(
       has(implicitCastExpr(
         has(declRefExpr())))))
-  ,
     
 ).bind("facConstructor"), this);
+
+  Finder->addMatcher(
+  cxxConstructExpr(
+    has(callExpr())
+).bind("ex4"),this);
+
 }
 
 
 void WrapUniqueCheck::check(const MatchFinder::MatchResult &Result) {
   // FIXME: Add callback implementation.
-  const auto *MatchedDecl = Result.Nodes.getNodeAs<FunctionDecl>("x");
-  if (MatchedDecl->getName().startswith("awesome_"))
-    return;
-  diag(MatchedDecl->getLocation(), "function %0 is insufficiently awesome")
-      << MatchedDecl
-      << FixItHint::CreateInsertion(MatchedDecl->getLocation(), "awesome_");
+  const auto *MatchedExpr = Result.Nodes.getNodeAs<CallExpr>("ex4");
+
+  //std::cout << MatchedExpr->getCallReturnType() << std::newl;
+
+  //diag(MatchedDecl->getLocation(), "function %0 is insufficiently awesome")
+     // << MatchedDecl
+     // << FixItHint::CreateInsertion(MatchedDecl->getLocation(), "awesome_");
 }
 
 } // namespace abseil
