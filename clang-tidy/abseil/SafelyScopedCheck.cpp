@@ -18,18 +18,14 @@ namespace tidy {
 namespace abseil {
 
 void SafelyScopedCheck::registerMatchers(MatchFinder *Finder) {
-  // FIXME: Add matchers.
-  Finder->addMatcher(functionDecl().bind("x"), this);
+  Finder->addMatcher(usingDecl(eachOf( usingDecl(unless(hasParent(namespaceDecl()))),
+        usingDecl(hasParent(namespaceDecl(forEach(namespaceDecl())))) )).bind("use"), this;
 }
 
 void SafelyScopedCheck::check(const MatchFinder::MatchResult &Result) {
-  // FIXME: Add callback implementation.
-  const auto *MatchedDecl = Result.Nodes.getNodeAs<FunctionDecl>("x");
-  if (MatchedDecl->getName().startswith("awesome_"))
-    return;
-  diag(MatchedDecl->getLocation(), "function %0 is insufficiently awesome")
-      << MatchedDecl
-      << FixItHint::CreateInsertion(MatchedDecl->getLocation(), "awesome_");
+  const auto *MatchedDecl = Result.Nodes.getNodeAs<UsingDecl>("use");
+  diag(MatchedDecl->getLocation(), "UsingDecl %0 should be in the innermost scope")
+      << MatchedDecl;
 }
 
 } // namespace abseil
