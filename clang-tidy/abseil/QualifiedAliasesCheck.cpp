@@ -18,18 +18,29 @@ namespace tidy {
 namespace abseil {
 
 void QualifiedAliasesCheck::registerMatchers(MatchFinder *Finder) {
-  // FIXME: Add matchers.
-  Finder->addMatcher(functionDecl().bind("x"), this);
+  // Looks for all using declarations.
+  Finder->addMatcher(usingDecl().bind("x"), this);
 }
 
 void QualifiedAliasesCheck::check(const MatchFinder::MatchResult &Result) {
-  // FIXME: Add callback implementation.
-  const auto *MatchedDecl = Result.Nodes.getNodeAs<FunctionDecl>("x");
-  if (MatchedDecl->getName().startswith("awesome_"))
+  const auto *MatchedDecl = Result.Nodes.getNodeAs<UsingDecl>("x");
+
+  // Finds the nested-name-specifier location.
+  const NestedNameSpecifierLoc qualifiedLoc = MatchedDecl->getQualifierLoc();
+  const SourceLocation nameFrontLoc = qualifiedLoc.getBeginLoc();
+
+  // Ignores the using declaration if its fully qualified.
+  const SourceManager *SM = Result.SourceManager;
+  CharSourceRange frontRange = CharSourceRange();
+  frontRange.setBegin(nameFrontLoc);
+  frontRange.setEnd(nameFrontLoc.getLocWithOffset(2));
+  llvm::StringRef ref = Lexer::getSourceText(frontRange, *SM, LangOptions());
+
+  if (ref.startswith("::"))
     return;
-  diag(MatchedDecl->getLocation(), "function %0 is insufficiently awesome")
-      << MatchedDecl
-      << FixItHint::CreateInsertion(MatchedDecl->getLocation(), "awesome_");
+
+  diag(nameFrontLoc, "using declaration is not fully qualified")
+  << FixItHint::CreateInsertion(nameFrontLoc, "::");
 }
 
 } // namespace abseil
