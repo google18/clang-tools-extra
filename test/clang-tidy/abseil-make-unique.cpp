@@ -88,6 +88,16 @@ void Positives() {
   ExpectPointer(std::unique_ptr<int>(new int(5)));
   // CHECK-MESSAGES: :[[@LINE-1]]:17: warning: prefer absl::make_unique to constructing unique_ptr with new [abseil-make-unique]
   // CHECK-FIXES: ExpectPointer(absl::make_unique<int>(5));
+
+  // Brace initialization
+  std::unique_ptr<B> k(new B{1, 2});
+  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::WrapUnique to constructing unique_ptr with new [abseil-make-unique]
+  // CHECK-FIXES: auto k = absl::WrapUnique(1, 2);
+  
+  std::unique_ptr<B> l;
+  l.reset(new B{3, 4});
+  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::WrapUnique to resetting unique_ptr with new [abseil-make-unique]
+  // CHECK-FIXES: l = absl::WrapUnique(3, 4);
 }
 
 // Checks within namespaces 
@@ -103,7 +113,4 @@ void Negatives() {
   
   std::unique_ptr<int> b;
   b.reset(ReturnPointer());
-
-  // Do not warn for aggregate initialization
-  std::unique_ptr<B> c(new B{.x = 1, .y = 2});
 }
