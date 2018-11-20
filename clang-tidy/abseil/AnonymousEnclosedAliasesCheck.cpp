@@ -10,6 +10,7 @@
 #include "AnonymousEnclosedAliasesCheck.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
+#include <iostream>
 
 using namespace clang::ast_matchers;
 
@@ -18,18 +19,38 @@ namespace tidy {
 namespace abseil {
 
 void AnonymousEnclosedAliasesCheck::registerMatchers(MatchFinder *Finder) {
-  // FIXME: Add matchers.
-  Finder->addMatcher(functionDecl().bind("x"), this);
+  // We try to match two nodes: 
+  // 1. anonymous namespace declarations,
+  // 2. using declarations that are not inside an anonymous declaration
+  Finder->addMatcher(namespaceDecl(isAnonymous()).bind("anonymous_namespace"), this);
+  Finder->addMatcher(usingDecl(unless(hasAncestor(namespaceDecl(isAnonymous())))).bind("using_decl"), this);
 }
 
+
 void AnonymousEnclosedAliasesCheck::check(const MatchFinder::MatchResult &Result) {
-  // FIXME: Add callback implementation.
-  const auto *MatchedDecl = Result.Nodes.getNodeAs<FunctionDecl>("x");
-  if (MatchedDecl->getName().startswith("awesome_"))
-    return;
-  diag(MatchedDecl->getLocation(), "function %0 is insufficiently awesome")
-      << MatchedDecl
-      << FixItHint::CreateInsertion(MatchedDecl->getLocation(), "awesome_");
+  
+  const UsingDecl *MatchedUsingDecl = Result.Nodes.getNodeAs<UsingDecl>("using_decl");
+  // If a potential using declaration is matched,
+  if (MatchedUsingDecl) {
+  	// and if an anonymous namespace declaration has already been found, the matched using declaration
+  	// is a target, and we print out the diagnostics for it. Otherwise, we add the using declaration
+  	// to the vector containing all candidate using declarations.
+  	if (AnonymousNamespaceDecl) {
+  		diag(MatchedUsingDecl->getLocation(), "UsingDecl %0 should be in the anonymous namespace")
+  << MatchedUsingDecl;
+		} else {
+			MatchedUsingDecls.push_back(MatchedUsingDecl);
+		}
+		return;
+  }
+  // Otherwise, an anonymous namespace declaration is matched. In this case, all the previously matched
+  // namespace declarations in the vector CurrentUsingDecl are our targets, and we print out the diagnostics
+  // for all of them.
+  AnonymousNamespaceDecl = Result.Nodes.getNodeAs<NamespaceDecl>("anonymous_namespace");
+  for (const UsingDecl* CurrentUsingDecl: MatchedUsingDecls) {
+  	diag(CurrentUsingDecl->getLocation(), "UsingDecl %0 should be in the anonymous namespace")
+  << CurrentUsingDecl;
+	}
 }
 
 } // namespace abseil
