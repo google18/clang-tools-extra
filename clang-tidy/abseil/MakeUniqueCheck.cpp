@@ -66,13 +66,17 @@ void MakeUniqueCheck::check(const MatchFinder::MatchResult &Result) {
     llvm::StringRef NameRef = Lexer::getSourceText(CharSourceRange::getCharRange(Cons->getBeginLoc(), Cons->getParenOrBraceRange().getBegin()), *SM, LangOptions());
     std::string Left = (ConsDecl) ? "auto " + NameRef.str() + " = " : "";
    
-    std::string NewText = Left + "absl::make_unique<" + getType(SM, ConsNew, Cons) + ">" + getArgs(SM, ConsNew);
-    std::string DiagText = "prefer absl::make_unique to constructing unique_ptr with new";
+    std::string NewText;
+    std::string DiagText;
 
     // Use WrapUnique for list initialization
     if (ConsNew->getInitializationStyle() == CXXNewExpr::InitializationStyle::ListInit) {
       NewText = Left + "absl::WrapUnique" + getArgs(SM, ConsNew);        
       DiagText = "prefer absl::WrapUnique to constructing unique_ptr with new";
+    }
+    else {
+      NewText = Left + "absl::make_unique<" + getType(SM, ConsNew, Cons) + ">" + getArgs(SM, ConsNew);
+      DiagText = "prefer absl::make_unique to constructing unique_ptr with new";
     }
 
     // If there is an associated Decl, start diagnostic there, otherwise use the beginning of the Expr   
@@ -96,6 +100,10 @@ void MakeUniqueCheck::check(const MatchFinder::MatchResult &Result) {
     if (ResetNew->getInitializationStyle() == CXXNewExpr::InitializationStyle::ListInit) {
       NewText = ObjName.str() + " = absl::WrapUnique" + getArgs(SM, ResetNew);
       DiagText = "prefer absl::WrapUnique to resetting unique_ptr with new";
+    }
+    else {
+      NewText = ObjName.str() + " = absl::make_unique<" + getType(SM, ResetNew, Reset) + ">" + getArgs(SM, ResetNew);
+      DiagText = "prefer absl::make_unique to resetting unique_ptr with new";
     }
 
     diag(ObjectArg->getExprLoc(), DiagText) 
