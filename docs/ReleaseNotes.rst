@@ -70,22 +70,26 @@ Improvements to clang-tidy
 - New :doc:`abseil-safely-scoped
   <clang-tidy/checks/abseil-safely-scoped>` check.
 
-  FIXME: add release notes.
+  Flags using declarations that are not contained in an innermost 
+  namespace, and suggests these declarations be moved elsewhere.
 
 - New :doc:`abseil-qualified-aliases
   <clang-tidy/checks/abseil-qualified-aliases>` check.
 
-  FIXME: add release notes.
+  Detects using declarations that are not fully qualified, and 
+  qualifies those declarations.
 
 - New :doc:`abseil-anonymous-enclosed-aliases
   <clang-tidy/checks/abseil-anonymous-enclosed-aliases>` check.
 
-  FIXME: add release notes.
+  Finds using declarations outside of anonymous namespaces, and 
+  suggests those declarations be moved to that namespace.
 
 - New :doc:`abseil-alias-free-headers
   <clang-tidy/checks/abseil-alias-free-headers>` check.
 
-  FIXME: add release notes.
+  Flags using declarations in header files, and suggests that 
+  these aliases be removed.
 
 - New :doc:`abseil-duration-division
   <clang-tidy/checks/abseil-duration-division>` check.
