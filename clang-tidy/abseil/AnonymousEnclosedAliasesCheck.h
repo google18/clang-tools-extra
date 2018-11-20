@@ -17,10 +17,11 @@ namespace clang {
 namespace tidy {
 namespace abseil {
 
-/// Detecting incorrect practice of putting using declarations outside an anonymous namespace 
-/// when there exists one.
+/// Detecting incorrect practice of putting using declarations outside an
+/// anonymous namespace when there exists one.
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/abseil-anonymous-enclosed-aliases.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/
+/// abseil-anonymous-enclosed-aliases.html
 class AnonymousEnclosedAliasesCheck : public ClangTidyCheck {
 public:
   AnonymousEnclosedAliasesCheck(StringRef Name, ClangTidyContext *Context)
