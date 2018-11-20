@@ -19,7 +19,7 @@ namespace abseil {
 
 void SafelyScopedCheck::registerMatchers(MatchFinder *Finder) {
   Finder->addMatcher(usingDecl(eachOf( usingDecl(unless(hasParent(namespaceDecl()))),
-        usingDecl(hasParent(namespaceDecl(forEach(namespaceDecl())))) )).bind("use"), this;
+        usingDecl(hasParent(namespaceDecl(forEach(namespaceDecl())))) )).bind("use"), this);
 }
 
 void SafelyScopedCheck::check(const MatchFinder::MatchResult &Result) {
