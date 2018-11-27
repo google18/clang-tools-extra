@@ -16,7 +16,8 @@ namespace clang {
 namespace tidy {
 namespace abseil {
 
-/// FIXME: Write a short description.
+/// Detecting using declarations not in a namespace declaration or not in 
+/// the innermost layer of namespace declarations.
 ///
 /// For the user-facing documentation see:
 /// http://clang.llvm.org/extra/clang-tidy/checks/abseil-safely-scoped.html
