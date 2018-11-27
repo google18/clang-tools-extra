@@ -48,9 +48,10 @@ void AnonymousEnclosedAliasesCheck::check(const MatchFinder::MatchResult &Result
 		}
 		return;
   }
-  // Otherwise, an anonymous namespace declaration is matched. In this case, all the previously matched
-  // namespace declarations in the vector CurrentUsingDecl are our targets, and we print out the diagnostics
-  // for all of them.
+  // Otherwise, an anonymous namespace declaration is matched. In this case, 
+  // all the previously matched namespace declarations in the vector 
+  // CurrentUsingDecl are our targets, and we print out the 
+  // diagnostics for all of them.
   AnonymousNamespaceDecl = 
   	Result.Nodes.getNodeAs<NamespaceDecl>("anonymous_namespace");
   for (const UsingDecl* CurrentUsingDecl: MatchedUsingDecls) {
