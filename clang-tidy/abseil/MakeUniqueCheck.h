@@ -16,10 +16,10 @@ namespace clang {
 namespace tidy {
 namespace abseil {
 
-/// Checks for unclear pointer ownership through constructing std::unique_ptr with 
-/// a call to new, and recommends using absl::make_unique or absl::WrapUnique 
-/// instead. Note that these are similar to the std::make_unique functions, but 
-/// differ in how they handle factory constructors and brace initialization, 
+/// Checks for unclear pointer ownership through constructing std::unique_ptr with
+/// a call to new, and recommends using absl::make_unique or absl::WrapUnique
+/// instead. Note that these are similar to the std::make_unique functions, but
+/// differ in how they handle factory constructors and brace initialization,
 /// choosing to defer to absl::WrapUnique.
 class MakeUniqueCheck : public ClangTidyCheck {
 private:
