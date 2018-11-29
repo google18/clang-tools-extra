@@ -8,7 +8,7 @@ Replaces unique pointers that are constructed with raw pointers with ``absl::mak
 .. code-block:: c++
   std::unique_ptr<int> upi(new int);
 
-will be replaced with 
+will be replaced with
 
 .. code-block:: c++
   auto upi = absl::make_unique<int>();

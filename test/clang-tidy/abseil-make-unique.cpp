@@ -37,8 +37,8 @@ std::unique_ptr<int> MakeAndReturnPointer() {
 
 void Positives() {
   std::unique_ptr<int> a(new int(1));
-  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to constructing unique_ptr with new [abseil-make-unique] 
-  // CHECK-FIXES: auto a = absl::make_unique<int>(1);  
+  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to constructing unique_ptr with new [abseil-make-unique]
+  // CHECK-FIXES: auto a = absl::make_unique<int>(1);
 
   std::unique_ptr<int> b;
   b.reset(new int(2));
@@ -47,13 +47,13 @@ void Positives() {
 
   // Non-primitive paramter
   std::unique_ptr<A> c(new A(1, 2));
-  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to constructing unique_ptr with new [abseil-make-unique] 
+  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to constructing unique_ptr with new [abseil-make-unique]
   // CHECK-FIXES: auto c = absl::make_unique<A>(1, 2);
 
   std::unique_ptr<A> d;
   d.reset(new A(3, 4));
   // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to resetting unique_ptr with new [abseil-make-unique]
-  // CHECK-FIXES: d = absl::make_unique<A>(3, 4);  
+  // CHECK-FIXES: d = absl::make_unique<A>(3, 4);
 
   // No arguments to new expression
   std::unique_ptr<int> e(new int);
@@ -62,8 +62,8 @@ void Positives() {
 
   std::unique_ptr<int> f;
   f.reset(new int);
-  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to resetting unique_ptr with new [abseil-make-unique] 
-  // CHECK-FIXES: f = absl::make_unique<int>(); 
+  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to resetting unique_ptr with new [abseil-make-unique]
+  // CHECK-FIXES: f = absl::make_unique<int>();
 
   // Nested parentheses
   std::unique_ptr<int> g((new int(3)));
@@ -76,14 +76,14 @@ void Positives() {
 
   std::unique_ptr<int> i;
   i.reset((new int(5)));
-  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to resetting unique_ptr with new [abseil-make-unique] 
+  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to resetting unique_ptr with new [abseil-make-unique]
   // CHECK-FIXES: i = absl::make_unique<int>(5);
 
   std::unique_ptr<int> j;
   j.reset(((new int(6))));
   // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to resetting unique_ptr with new [abseil-make-unique]
   // CHECK-FIXES: j = absl::make_unique<int>(6);
-  
+
   // Construct unique_ptr within a function
   ExpectPointer(std::unique_ptr<int>(new int(5)));
   // CHECK-MESSAGES: :[[@LINE-1]]:17: warning: prefer absl::make_unique to constructing unique_ptr with new [abseil-make-unique]
@@ -93,24 +93,24 @@ void Positives() {
   std::unique_ptr<B> k(new B{1, 2});
   // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::WrapUnique to constructing unique_ptr with new [abseil-make-unique]
   // CHECK-FIXES: auto k = absl::WrapUnique(1, 2);
-  
+
   std::unique_ptr<B> l;
   l.reset(new B{3, 4});
   // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::WrapUnique to resetting unique_ptr with new [abseil-make-unique]
   // CHECK-FIXES: l = absl::WrapUnique(3, 4);
 }
 
-// Checks within namespaces 
+// Checks within namespaces
 namespace std {
   unique_ptr<int> k(new int(7));
   // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to constructing unique_ptr with new [abseil-make-unique]
-  // CHECK-FIXES: auto k = absl::make_unique<int>(7); 
+  // CHECK-FIXES: auto k = absl::make_unique<int>(7);
 }
 
 void Negatives() {
   // Do not warn for functions that return a pointer
   std::unique_ptr<int> a(ReturnPointer());
-  
+
   std::unique_ptr<int> b;
   b.reset(ReturnPointer());
 }
