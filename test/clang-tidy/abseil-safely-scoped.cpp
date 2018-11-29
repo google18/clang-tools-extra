@@ -14,11 +14,8 @@ namespace {
 
 }  // anonymous namespace
 }  // namespace foo
-// CHECK-MESSAGES: :[[@LINE-6]]:12: warning: UsingDecl 'something' should be in the innermost scope [abseil-safely-scoped-aliases]
+// CHECK-MESSAGES: :[[@LINE-6]]:12: warning: UsingDecl 'something' should be in the innermost scope [abseil-safely-scoped]
 
-// FIXME: Verify the applied fix.
-
-// FIXME: Add something that doesn't trigger the check here.
 namespace foo {
 
 namespace {

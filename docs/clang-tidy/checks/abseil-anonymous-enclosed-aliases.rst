@@ -3,4 +3,17 @@
 abseil-anonymous-enclosed-aliases
 =================================
 
-FIXME: Describe what patterns does the check detect and why. Give examples.
+Flag uses of using declarations outside an anonymous namespace when there exists one.
+
+Example:
+.. code-block:: c++
+
+  namespace foo {
+  
+  using something; // should be inside the anonymous namespace below
+
+  namespace {
+
+  } // anonymous namespace
+
+  } // foo
