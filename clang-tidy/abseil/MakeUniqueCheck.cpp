@@ -65,7 +65,7 @@ void MakeUniqueCheck::check(const MatchFinder::MatchResult &Result) {
     // Get name of declared variable, if exists
     llvm::StringRef NameRef = Lexer::getSourceText(CharSourceRange::getCharRange(Cons->getBeginLoc(), Cons->getParenOrBraceRange().getBegin()), *SM, LangOptions());
     std::string Left = (ConsDecl) ? "auto " + NameRef.str() + " = " : "";
-   
+
     std::string NewText;
     std::string DiagText;
 
@@ -73,9 +73,9 @@ void MakeUniqueCheck::check(const MatchFinder::MatchResult &Result) {
     if (ConsNew->getInitializationStyle() == CXXNewExpr::InitializationStyle::ListInit) {
       NewText = Left + "absl::WrapUnique" + getArgs(SM, ConsNew);        
       DiagText = "prefer absl::WrapUnique to constructing unique_ptr with new";
-    }
-    else {
-      NewText = Left + "absl::make_unique<" + getType(SM, ConsNew, Cons) + ">" + getArgs(SM, ConsNew);
+    } else {
+      NewText = Left + "absl::make_unique<" + getType(SM, ConsNew, Cons) + ">" +
+                getArgs(SM, ConsNew);
       DiagText = "prefer absl::make_unique to constructing unique_ptr with new";
     }
 
@@ -100,9 +100,9 @@ void MakeUniqueCheck::check(const MatchFinder::MatchResult &Result) {
     if (ResetNew->getInitializationStyle() == CXXNewExpr::InitializationStyle::ListInit) {
       NewText = ObjName.str() + " = absl::WrapUnique" + getArgs(SM, ResetNew);
       DiagText = "prefer absl::WrapUnique to resetting unique_ptr with new";
-    }
-    else {
-      NewText = ObjName.str() + " = absl::make_unique<" + getType(SM, ResetNew, Reset) + ">" + getArgs(SM, ResetNew);
+    } else {
+      NewText = ObjName.str() + " = absl::make_unique<" +
+                getType(SM, ResetNew, Reset) + ">" + getArgs(SM, ResetNew);
       DiagText = "prefer absl::make_unique to resetting unique_ptr with new";
     }
 

@@ -70,7 +70,9 @@ Improvements to clang-tidy
 - New :doc:`abseil-make-unique
   <clang-tidy/checks/abseil-make-unique>` check.
 
-  FIXME: add release notes.
+  Checks for cases where ``std::unique_ptr`` is constructed with a call
+  to new, and recommends that ``absl::make_unique`` or ``absl::WrapUnique``
+  are used instead.
 
 - New :doc:`abseil-duration-division
   <clang-tidy/checks/abseil-duration-division>` check.
