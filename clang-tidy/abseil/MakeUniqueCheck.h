@@ -24,7 +24,7 @@ class MakeUniqueCheck : public ClangTidyCheck {
 private:
   std::string getArgs(const SourceManager *SM, const CXXNewExpr *NewExpr);
   std::string getType(const SourceManager *SM, const CXXNewExpr *NewExpr, const Expr *Outer);
- 
+
 public:
   MakeUniqueCheck(StringRef Name, ClangTidyContext *Context)
       : ClangTidyCheck(Name, Context) {}
