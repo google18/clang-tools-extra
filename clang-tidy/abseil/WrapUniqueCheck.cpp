@@ -7,6 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <string>
 #include <iostream>
 #include "WrapUniqueCheck.h"
 #include "clang/AST/ASTContext.h"
@@ -18,6 +19,18 @@ namespace clang {
 namespace tidy {
 namespace abseil {
 
+std::string WrapUniqueCheck::getArgs(const SourceManager *SM,
+                                     const CallExpr *MemExpr) {
+  std::cout << MemExpr->getNumArgs() << std::endl;
+  
+  
+  llvm::StringRef ArgRef = Lexer::getSourceText(
+    CharSourceRange::getCharRange(
+      MemExpr->getSourceRange()), *SM, LangOptions());
+
+  return (ArgRef.str().length() > 0) ? ArgRef.str() + ")" : "()";
+}
+
 void WrapUniqueCheck::registerMatchers(MatchFinder *Finder) {
   Finder->addMatcher( 
   cxxMemberCallExpr(
@@ -28,9 +41,11 @@ void WrapUniqueCheck::registerMatchers(MatchFinder *Finder) {
     has(memberExpr(
       has(declRefExpr())))
   ,
-    has(callExpr(
+    has(callExpr( 
       has(implicitCastExpr(
-        has(declRefExpr())))))
+        has(declRefExpr()))))) 
+  ,
+    hasArgument(0, callExpr().bind("cons_new"))
     
 ).bind("facConstructor"), this);
 
@@ -43,16 +58,36 @@ void WrapUniqueCheck::registerMatchers(MatchFinder *Finder) {
 
 
 void WrapUniqueCheck::check(const MatchFinder::MatchResult &Result) {
-  // FIXME: Add callback implementation.
-  const auto *MatchedExpr = Result.Nodes.getNodeAs<CallExpr>("ex4");
+  // gets the instance of factory constructor
+  const SourceManager *SM = Result.SourceManager;
+  const auto *facExpr = Result.Nodes.getNodeAs<CXXMemberCallExpr>("facConstructor");
+  const auto *ConsNew = Result.Nodes.getNodeAs<CallExpr>("cons_new");
+  //upfc.reset(FactoryConstruvtible::NewFC());
 
-  //std::cout << MatchedExpr->getCallReturnType() << std::newl;
+  //upfc = absl::WrapUnique(FactoryConstructible::NewFC());
 
-  //diag(MatchedDecl->getLocation(), "function %0 is insufficiently awesome")
-     // << MatchedDecl
-     // << FixItHint::CreateInsertion(MatchedDecl->getLocation(), "awesome_");
+  if(facExpr){
+    std::string diagText = "Perfer absl::WrapUnique for reseting unique_ptr";
+    std::string newText;
+    
+    const Expr *ObjectArg = facExpr -> getImplicitObjectArgument();
+
+    SourceLocation Target = ObjectArg ->  getExprLoc();
+    
+    llvm::StringRef ObjName = Lexer::getSourceText(CharSourceRange::getCharRange(
+        ObjectArg->getBeginLoc(), facExpr->getExprLoc().getLocWithOffset(-1)),
+        *SM, LangOptions());
+
+    newText = ObjName.str() + " = absl::WrapUnique(" + getArgs(SM, ConsNew) + ")"; 
+
+    diag(Target, diagText)
+      << FixItHint::CreateReplacement(
+           CharSourceRange::getTokenRange( 
+           Target, facExpr->getEndLoc()), newText);
+  }
+
 }
 
 } // namespace abseil
 } // namespace tidy
-} // namespace clang
+} // namespace clang 

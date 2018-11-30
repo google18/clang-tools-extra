@@ -17,6 +17,7 @@ Clang-Tidy Checks
    abseil-safely-scoped-aliases
    abseil-str-cat-append
    abseil-string-find-startswith
+   abseil-wrap-unique
    android-cloexec-accept
    android-cloexec-accept4
    android-cloexec-creat

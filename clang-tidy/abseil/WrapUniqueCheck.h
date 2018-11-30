@@ -21,6 +21,10 @@ namespace abseil {
 /// For the user-facing documentation see:
 /// http://clang.llvm.org/extra/clang-tidy/checks/abseil-wrap-unique.html
 class WrapUniqueCheck : public ClangTidyCheck {
+private:
+
+  std::string getArgs(const SourceManager *SM, const CallExpr *MemExpr);
+
 public:
   WrapUniqueCheck(StringRef Name, ClangTidyContext *Context)
       : ClangTidyCheck(Name, Context) {}
