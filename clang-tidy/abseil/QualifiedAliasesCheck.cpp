@@ -34,8 +34,8 @@ void QualifiedAliasesCheck::check(const MatchFinder::MatchResult &Result) {
   // Ignores the using declaration if its fully qualified.
   const SourceManager *SM = Result.SourceManager;
   CharSourceRange FrontRange = CharSourceRange();
-  frontRange.setBegin(FrontLoc);
-  frontRange.setEnd(FrontLoc.getLocWithOffset(2));
+  FrontRange.setBegin(FrontLoc);
+  FrontRange.setEnd(FrontLoc.getLocWithOffset(2));
   llvm::StringRef Beg = Lexer::getSourceText(FrontRange, *SM, LangOptions());
 
   if (Beg.startswith("::"))
