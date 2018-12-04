@@ -3,7 +3,8 @@
 abseil-anonymous-enclosed-aliases
 =================================
 
-Flag uses of using declarations outside an anonymous namespace when there exists one.
+Finds using declarations outside of anonymous namespaces, and
+suggests those declarations be moved to that namespace.
 
 Example:
 .. code-block:: c++
