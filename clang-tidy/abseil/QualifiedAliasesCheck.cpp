@@ -11,6 +11,10 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 
+#include "llvm/Support/raw_ostream.h"
+#include <string>
+#include <iostream>
+
 using namespace clang::ast_matchers;
 
 namespace clang {
@@ -38,9 +42,8 @@ void QualifiedAliasesCheck::check(const MatchFinder::MatchResult &Result) {
 
   if (ref.startswith("::"))
     return;
-
-  diag(nameFrontLoc, "using declaration is not fully qualified")
-  << FixItHint::CreateInsertion(nameFrontLoc, "::");
+ 
+  diag(nameFrontLoc, "using declaration is not fully qualified");
 }
 
 } // namespace abseil

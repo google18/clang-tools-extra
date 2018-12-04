@@ -1,5 +1,5 @@
 // RUN: %check_clang_tidy %s abseil-qualified-aliases %t
-  
+
 namespace foo {
   void f();
   void correct();
@@ -11,8 +11,17 @@ namespace bar {
   using ::foo::correct;
 }
 
-//   * Make the CHECK patterns specific enough and try to make verified lines
-//     unique to avoid incorrect matches.
-//   * Use {{}} for regular expressions.
-// CHECK-FIXES: {{^}}  using ::foo::f;{{$}}
+namespace outermost {
+  namespace middle {
+    namespace innermost {
+
+      enum Color {Red, Blue, Yellow};
+
+    } // namespace innermost
+
+    using innermost::Color;
+// CHECK-MESSAGES: :[[@LINE-1]]:11: warning: using declaration is not fully qualified [abseil-qualified-aliases]
+
+  } // namespace middle
+} // namespace example
 
