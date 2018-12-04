@@ -11,9 +11,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 
-#include "llvm/Support/raw_ostream.h"
 #include <string>
-#include <iostream>
 
 using namespace clang::ast_matchers;
 
