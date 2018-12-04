@@ -7,7 +7,7 @@ namespace foo {
 
 namespace bar {
   using foo::f;
-// CHECK-MESSAGES: :[[@LINE-1]]:9: warning: using declaration is not fully qualified [abseil-qualified-aliases]
+// CHECK-MESSAGES: :[[@LINE-1]]:9: warning: using declaration is not fully qualified: see https://abseil.io/tips/119 [abseil-qualified-aliases]
   using ::foo::correct;
 }
 
@@ -20,7 +20,7 @@ namespace outermost {
     } // namespace innermost
 
     using innermost::Color;
-// CHECK-MESSAGES: :[[@LINE-1]]:11: warning: using declaration is not fully qualified [abseil-qualified-aliases]
+// CHECK-MESSAGES: :[[@LINE-1]]:11: warning: using declaration is not fully qualified: see https://abseil.io/tips/119 [abseil-qualified-aliases]
 
   } // namespace middle
 } // namespace example
