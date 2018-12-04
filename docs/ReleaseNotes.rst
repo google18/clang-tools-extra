@@ -113,8 +113,8 @@ Improvements to clang-tidy
 - New :doc:`abseil-qualified-aliases
   <clang-tidy/checks/abseil-qualified-aliases>` check.
 
-  Detects using declarations that are not fully qualified, and 
-  qualifies those declarations.
+  Detects using declarations that are not fully qualified, and suggests 
+  those declarations be fully qualified.
 
 - New :doc:`abseil-redundant-strcat-calls
   <clang-tidy/checks/abseil-redundant-strcat-calls>` check.
