@@ -3,22 +3,26 @@
 abseil-safely-scoped
 ====================
 
-Flag situations where a using declaration is not inside a namespace, or
-not inside the innermost namespace when there is a nested series of 
-namespaces.
+Flags using declarations that are not contained in an innermost
+namespace, and suggests these declarations be moved elsewhere.
 
 Example:
 
 .. code-block:: c++
 
-using something; // should be inside the innermost namespace bar below
+  using something; // should be inside the innermost namespace bar below
 
-namespace foo {
-
-namespace bar {
+  namespace foo {
+  namespace bar {
 	
-} // bar
+  } // bar
 
-using somethingelse; // shoulw be inside the innermost namespace bar above
+  using something_else; // shoulw be inside the innermost namespace bar above
 
-} // foo
+  } // foo
+
+Placing convenience aliases in upper level namespaces can lead to ambiguity in 
+which name the compiler should use. 
+
+See https://abseil.io/tips/119 for more explanation. 
+
