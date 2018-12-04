@@ -56,7 +56,8 @@ void AnonymousEnclosedAliasesCheck::check(const MatchFinder::MatchResult &Result
   	Result.Nodes.getNodeAs<NamespaceDecl>("anonymous_namespace");
   for (const UsingDecl* CurrentUsingDecl: MatchedUsingDecls) {
   	diag(CurrentUsingDecl->getLocation(), 
-  		"UsingDecl %0 should be in the anonymous namespace")
+  		"UsingDecl %0 should be in the anonymous namespace. See: "
+      "https://abseil.io/tips/119")
   		<< CurrentUsingDecl;
 	}
 }

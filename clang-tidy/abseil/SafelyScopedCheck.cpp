@@ -29,7 +29,8 @@ void SafelyScopedCheck::registerMatchers(MatchFinder *Finder) {
 
 void SafelyScopedCheck::check(const MatchFinder::MatchResult &Result) {
   const auto *MatchedDecl = Result.Nodes.getNodeAs<UsingDecl>("use");
-  diag(MatchedDecl->getLocation(), "UsingDecl %0 should be in the innermost scope")
+  diag(MatchedDecl->getLocation(), "UsingDecl %0 should be in the innermost "
+    "scope. See: https://abseil.io/tips/119")
       << MatchedDecl;
 }
 

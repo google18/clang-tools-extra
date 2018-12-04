@@ -14,7 +14,7 @@ namespace {
 
 }  // anonymous namespace
 }  // namespace foo
-// CHECK-MESSAGES: :[[@LINE-6]]:12: warning: UsingDecl 'something' should be in the anonymous namespace [abseil-anonymous-enclosed-aliases]
+// CHECK-MESSAGES: :[[@LINE-6]]:12: warning: UsingDecl 'something' should be in the anonymous namespace. See: https://abseil.io/tips/119 [abseil-anonymous-enclosed-aliases]
 
 
 namespace foo {
