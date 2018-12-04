@@ -11,6 +11,8 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 
+#include <string>
+
 using namespace clang::ast_matchers;
 
 namespace clang {
@@ -26,21 +28,21 @@ void QualifiedAliasesCheck::check(const MatchFinder::MatchResult &Result) {
   const auto *MatchedDecl = Result.Nodes.getNodeAs<UsingDecl>("x");
 
   // Finds the nested-name-specifier location.
-  const NestedNameSpecifierLoc qualifiedLoc = MatchedDecl->getQualifierLoc();
-  const SourceLocation nameFrontLoc = qualifiedLoc.getBeginLoc();
+  const NestedNameSpecifierLoc QualifiedLoc = MatchedDecl->getQualifierLoc();
+  const SourceLocation FrontLoc = QualifiedLoc.getBeginLoc();
 
   // Ignores the using declaration if its fully qualified.
   const SourceManager *SM = Result.SourceManager;
-  CharSourceRange frontRange = CharSourceRange();
-  frontRange.setBegin(nameFrontLoc);
-  frontRange.setEnd(nameFrontLoc.getLocWithOffset(2));
-  llvm::StringRef ref = Lexer::getSourceText(frontRange, *SM, LangOptions());
+  CharSourceRange FrontRange = CharSourceRange();
+  FrontRange.setBegin(FrontLoc);
+  FrontRange.setEnd(FrontLoc.getLocWithOffset(2));
+  llvm::StringRef Beg = Lexer::getSourceText(FrontRange, *SM, LangOptions());
 
-  if (ref.startswith("::"))
+  if (Beg.startswith("::"))
     return;
-
-  diag(nameFrontLoc, "using declaration is not fully qualified")
-  << FixItHint::CreateInsertion(nameFrontLoc, "::");
+ 
+  diag(FrontLoc, "using declaration is not fully qualified: see "
+  "https://abseil.io/tips/119");
 }
 
 } // namespace abseil

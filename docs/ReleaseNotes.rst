@@ -67,29 +67,17 @@ The improvements are...
 Improvements to clang-tidy
 --------------------------
 
-- New :doc:`abseil-safely-scoped
-  <clang-tidy/checks/abseil-safely-scoped>` check.
+- New :doc:`abseil-alias-free-headers
+  <clang-tidy/checks/abseil-alias-free-headers>` check.
 
-  Flags using declarations that are not contained in an innermost 
-  namespace, and suggests these declarations be moved elsewhere.
-
-- New :doc:`abseil-qualified-aliases
-  <clang-tidy/checks/abseil-qualified-aliases>` check.
-
-  Detects using declarations that are not fully qualified, and 
-  qualifies those declarations.
+  Flags using declarations in header files, and suggests that 
+  these aliases be removed.
 
 - New :doc:`abseil-anonymous-enclosed-aliases
   <clang-tidy/checks/abseil-anonymous-enclosed-aliases>` check.
 
   Finds using declarations outside of anonymous namespaces, and 
   suggests those declarations be moved to that namespace.
-
-- New :doc:`abseil-alias-free-headers
-  <clang-tidy/checks/abseil-alias-free-headers>` check.
-
-  Flags using declarations in header files, and suggests that 
-  these aliases be removed.
 
 - New :doc:`abseil-duration-division
   <clang-tidy/checks/abseil-duration-division>` check.
@@ -122,11 +110,23 @@ Improvements to clang-tidy
   Ensures code does not open ``namespace absl`` as that violates Abseil's
   compatibility guidelines.
 
+- New :doc:`abseil-qualified-aliases
+  <clang-tidy/checks/abseil-qualified-aliases>` check.
+
+  Detects using declarations that are not fully qualified, and suggests 
+  those declarations be fully qualified.
+
 - New :doc:`abseil-redundant-strcat-calls
   <clang-tidy/checks/abseil-redundant-strcat-calls>` check.
 
   Suggests removal of unnecessary calls to ``absl::StrCat`` when the result is
   being passed to another ``absl::StrCat`` or ``absl::StrAppend``.
+
+- New :doc:`abseil-safely-scoped
+  <clang-tidy/checks/abseil-safely-scoped>` check.
+
+  Flags using declarations that are not contained in an innermost 
+  namespace, and suggests these declarations be moved elsewhere.
 
 - New :doc:`abseil-str-cat-append
   <clang-tidy/checks/abseil-str-cat-append>` check.
