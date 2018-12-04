@@ -19,12 +19,14 @@ namespace abseil {
 
 void AliasFreeHeadersCheck::registerMatchers(MatchFinder *Finder) {
   // Match using declarations in header files.
-  Finder->addMatcher(usingDecl(isExpansionInFileMatching(".*\\.h.*")).bind("x"), this);
+  Finder->addMatcher(usingDecl(isExpansionInFileMatching(".*\\.h.*")).bind("x"), 
+    this);
 }
 
 void AliasFreeHeadersCheck::check(const MatchFinder::MatchResult &Result) {
   const auto *MatchedDecl = Result.Nodes.getNodeAs<UsingDecl>("x");
-  diag(MatchedDecl->getLocation(), "convenience aliases in header files are dangerous");
+  diag(MatchedDecl->getLocation(), "convenience aliases in header files are "
+"dangerous: see http://google.github.io/styleguide/cppguide.html#Aliases");
 }
 
 } // namespace abseil
