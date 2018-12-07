@@ -70,7 +70,8 @@ Improvements to clang-tidy
 - New :doc:`abseil-alias-free-headers
   <clang-tidy/checks/abseil-alias-free-headers>` check.
 
-  FIXME: add release notes.
+  Flags using declarations in header files, and suggests that
+  these aliases be removed. 
 
 - New :doc:`abseil-duration-division
   <clang-tidy/checks/abseil-duration-division>` check.
