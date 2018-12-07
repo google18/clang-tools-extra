@@ -67,6 +67,12 @@ The improvements are...
 Improvements to clang-tidy
 --------------------------
 
+- New :doc:`abseil-safely-scoped
+  <clang-tidy/checks/abseil-safely-scoped>` check.
+
+  Finds instances of using declarations not in the innermost layer
+  of a series of namespaces.
+
 - New :doc:`abseil-duration-division
   <clang-tidy/checks/abseil-duration-division>` check.
 
