@@ -2,7 +2,7 @@
 
 abseil-qualified-aliases
 ========================
- 
+
 Detects using declarations that are not fully qualified, and suggests
 that the developer fully qualify those declarations.
 
@@ -13,7 +13,7 @@ Example:
     void f();
     void correct();
   }
-  
+
   namespace bar {
     using foo::f; // The check produces a warning here. 
     using ::foo::correct; // The check sees no issue here.

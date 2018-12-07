@@ -1,5 +1,5 @@
 // RUN: %check_clang_tidy %s abseil-qualified-aliases %t
-  
+
 namespace foo {
   void f();
   void correct();
