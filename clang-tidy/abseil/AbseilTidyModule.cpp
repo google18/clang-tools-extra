@@ -15,6 +15,7 @@
 #include "FasterStrsplitDelimiterCheck.h"
 #include "NoInternalDependenciesCheck.h"
 #include "NoNamespaceCheck.h"
+#include "QualifiedAliasesCheck.h"
 #include "RedundantStrcatCallsCheck.h"
 #include "StringFindStartswithCheck.h"
 #include "StrCatAppendCheck.h"
@@ -35,6 +36,8 @@ public:
     CheckFactories.registerCheck<NoInternalDependenciesCheck>(
         "abseil-no-internal-dependencies");
     CheckFactories.registerCheck<NoNamespaceCheck>("abseil-no-namespace");
+    CheckFactories.registerCheck<QualifiedAliasesCheck>(
+        "abseil-qualified-aliases");
     CheckFactories.registerCheck<RedundantStrcatCallsCheck>(
         "abseil-redundant-strcat-calls");
     CheckFactories.registerCheck<StrCatAppendCheck>(
