@@ -18,7 +18,6 @@
 # vim swap files
 .*.swp
 .sw?
-.DS_Store
 
 #==============================================================================#
 # Explicit files to ignore (only matches one).
