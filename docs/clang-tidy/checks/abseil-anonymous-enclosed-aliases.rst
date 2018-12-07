@@ -3,4 +3,18 @@
 abseil-anonymous-enclosed-aliases
 =================================
 
-FIXME: Describe what patterns does the check detect and why. Give examples.
+Finds using declarations outside of anonymous namespaces, and
+suggests those declarations be moved to that namespace.
+
+Example:
+.. code-block:: c++
+
+  namespace foo {
+  
+  using something; // should be inside the anonymous namespace below
+
+  namespace {
+
+  } // anonymous namespace
+
+  } // foo

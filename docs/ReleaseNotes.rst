@@ -70,7 +70,8 @@ Improvements to clang-tidy
 - New :doc:`abseil-anonymous-enclosed-aliases
   <clang-tidy/checks/abseil-anonymous-enclosed-aliases>` check.
 
-  FIXME: add release notes.
+  Finds instances of using declarations not in an anonymous namespace
+  when there exists one.
 
 - New :doc:`abseil-duration-division
   <clang-tidy/checks/abseil-duration-division>` check.
