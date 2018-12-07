@@ -67,11 +67,6 @@ The improvements are...
 Improvements to clang-tidy
 --------------------------
 
-- New :doc:`abseil-qualified-aliases
-  <clang-tidy/checks/abseil-qualified-aliases>` check.
-
-  FIXME: add release notes.
-
 - New :doc:`abseil-duration-division
   <clang-tidy/checks/abseil-duration-division>` check.
 
@@ -102,6 +97,12 @@ Improvements to clang-tidy
 
   Ensures code does not open ``namespace absl`` as that violates Abseil's
   compatibility guidelines.
+
+- New :doc:`abseil-qualified-aliases
+  <clang-tidy/checks/abseil-qualified-aliases>` check.
+
+  Detects using declarations that are not fully qualified, and suggests
+  that the developer fully qualify those declarations. 
 
 - New :doc:`abseil-redundant-strcat-calls
   <clang-tidy/checks/abseil-redundant-strcat-calls>` check.
