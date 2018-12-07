@@ -18,26 +18,26 @@ namespace tidy {
 namespace abseil {
 
 void AnonymousEnclosedAliasesCheck::registerMatchers(MatchFinder *Finder) {
-  // We try to match two nodes: 
+  // We try to match two nodes:
   // 1. anonymous namespace declarations,
   // 2. using declarations that are not inside an anonymous declaration
   Finder->addMatcher(
-  	namespaceDecl(isAnonymous()).bind("anonymous_namespace"), this);
+  namespaceDecl(isAnonymous()).bind("anonymous_namespace"), this);
   Finder->addMatcher(
-  	usingDecl(unless(hasAncestor(
-  		namespaceDecl(isAnonymous())))).bind("using_decl"), this);
+  usingDecl(unless(hasAncestor(
+  namespaceDecl(isAnonymous())))).bind("using_decl"), this);
 }
 
 void AnonymousEnclosedAliasesCheck::check(const MatchFinder::MatchResult &Result) {
-  
-  const auto *MatchedUsingDecl = 
-  	Result.Nodes.getNodeAs<UsingDecl>("using_decl");
+
+  const auto *MatchedUsingDecl =
+  Result.Nodes.getNodeAs<UsingDecl>("using_decl");
   // If a potential using declaration is matched,
   if (MatchedUsingDecl) {
-  	// and if an anonymous namespace declaration has already been found,
-  	// the matched using declaration is a target, and we print out 
-  	// the diagnostics for it. Otherwise, we add the using declaration
-  	// to the vector containing all candidate using declarations.
+  // and if an anonymous namespace declaration has already been found,
+  // the matched using declaration is a target, and we print out 
+  // the diagnostics for it. Otherwise, we add the using declaration
+  // to the vector containing all candidate using declarations.
   	if (AnonymousNamespaceDecl) {
   		diag(MatchedUsingDecl->getLocation(), 
   			"UsingDecl %0 should be in the anonymous namespace") 
