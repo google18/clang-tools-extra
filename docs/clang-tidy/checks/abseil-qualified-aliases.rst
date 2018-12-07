@@ -15,7 +15,7 @@ Example:
   }
 
   namespace bar {
-    using foo::f; // The check produces a warning here. 
+    using foo::f; // The check produces a warning here.
     using ::foo::correct; // The check sees no issue here.
   }
 
