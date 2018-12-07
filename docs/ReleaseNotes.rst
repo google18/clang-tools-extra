@@ -71,7 +71,7 @@ Improvements to clang-tidy
   <clang-tidy/checks/abseil-alias-free-headers>` check.
 
   Flags using declarations in header files, and suggests that
-  these aliases be removed. 
+  these aliases be removed
 
 - New :doc:`abseil-duration-division
   <clang-tidy/checks/abseil-duration-division>` check.
