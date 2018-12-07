@@ -40,7 +40,8 @@ void AnonymousEnclosedAliasesCheck::check(const MatchFinder::MatchResult &Result
     // to the vector containing all candidate using declarations.
     if (AnonymousNamespaceDecl) {
   		diag(MatchedUsingDecl->getLocation(),
-  			"UsingDecl %0 should be in the anonymous namespace")
+  			"UsingDecl %0 should be in the anonymous namespace. See: "
+        "https://abseil.io/tips/119")
   			<< MatchedUsingDecl;
 		} else {
 			MatchedUsingDecls.push_back(MatchedUsingDecl);
