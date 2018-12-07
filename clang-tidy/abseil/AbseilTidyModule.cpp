@@ -10,6 +10,7 @@
 #include "../ClangTidy.h"
 #include "../ClangTidyModule.h"
 #include "../ClangTidyModuleRegistry.h"
+#include "AnonymousEnclosedAliasesCheck.h"
 #include "DurationDivisionCheck.h"
 #include "DurationFactoryFloatCheck.h"
 #include "FasterStrsplitDelimiterCheck.h"
@@ -26,6 +27,8 @@ namespace abseil {
 class AbseilModule : public ClangTidyModule {
 public:
   void addCheckFactories(ClangTidyCheckFactories &CheckFactories) override {
+    CheckFactories.registerCheck<AnonymousEnclosedAliasesCheck>(
+        "abseil-anonymous-enclosed-aliases");
     CheckFactories.registerCheck<DurationDivisionCheck>(
         "abseil-duration-division");
     CheckFactories.registerCheck<DurationFactoryFloatCheck>(

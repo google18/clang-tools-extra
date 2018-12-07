@@ -67,6 +67,11 @@ The improvements are...
 Improvements to clang-tidy
 --------------------------
 
+- New :doc:`abseil-anonymous-enclosed-aliases
+  <clang-tidy/checks/abseil-anonymous-enclosed-aliases>` check.
+
+  FIXME: add release notes.
+
 - New :doc:`abseil-duration-division
   <clang-tidy/checks/abseil-duration-division>` check.
 
