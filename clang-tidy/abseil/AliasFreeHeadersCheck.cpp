@@ -18,7 +18,7 @@ namespace tidy {
 namespace abseil {
 
 void AliasFreeHeadersCheck::registerMatchers(MatchFinder *Finder) {
-  // Match all using declarations in header files. 
+  // Match all using declarations in header files.
   Finder->addMatcher(usingDecl(isExpansionInFileMatching(".*\\.h.*")).bind("x"),
     this);
 }
