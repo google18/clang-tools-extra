@@ -40,8 +40,7 @@ void QualifiedAliasesCheck::check(const MatchFinder::MatchResult &Result) {
   if (Beg.startswith("::"))
     return;
 
-  diag(FrontLoc, "using declaration is not fully qualified: see "
-  "https://abseil.io/tips/119");
+  diag(FrontLoc, "using declaration is not fully qualified);
 }
 
 } // namespace abseil
