@@ -16,7 +16,8 @@ namespace clang {
 namespace tidy {
 namespace abseil {
 
-/// FIXME: Write a short description.
+/// Detects using declarations which are not fully qualified, and suggests
+/// that the user fully qualify those names.
 ///
 /// For the user-facing documentation see:
 /// http://clang.llvm.org/extra/clang-tidy/checks/abseil-qualified-aliases.html
