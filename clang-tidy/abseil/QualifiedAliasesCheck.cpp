@@ -26,11 +26,11 @@ void QualifiedAliasesCheck::check(const MatchFinder::MatchResult &Result) {
   const auto *MatchedDecl = Result.Nodes.getNodeAs<UsingDecl>("x");
 
   // Finds the nested-name-specifier location.
-  const NestedNameSpecifierLoc QualifiedLoc = MatchedDecl->getQualifierLoc();
-  const SourceLocation FrontLoc = QualifiedLoc.getBeginLoc();
+  NestedNameSpecifierLoc QualifiedLoc = MatchedDecl->getQualifierLoc();
+  SourceLocation FrontLoc = QualifiedLoc.getBeginLoc();
 
   // Checks if the using declaration is fully qualified.
-  const SourceManager *SM = Result.SourceManager;
+  SourceManager *SM = Result.SourceManager;
   CharSourceRange FrontRange = CharSourceRange();
   FrontRange.setBegin(FrontLoc);
   FrontRange.setEnd(FrontLoc.getLocWithOffset(2));
