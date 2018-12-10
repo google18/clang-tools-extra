@@ -31,9 +31,8 @@ void QualifiedAliasesCheck::check(const MatchFinder::MatchResult &Result) {
 
   // Checks if the using declaration is fully qualified.
   SourceManager *SM = Result.SourceManager;
-  CharSourceRange FrontRange = CharSourceRange();
-  FrontRange.setBegin(FrontLoc);
-  FrontRange.setEnd(FrontLoc.getLocWithOffset(2));
+  CharSourceRange().setBegin(FrontLoc);
+  CharSourceRange().setEnd(FrontLoc.getLocWithOffset(2));
   llvm::StringRef Beg = Lexer::getSourceText(FrontRange, *SM, LangOptions());
 
   // If the using declaration is fully qualified, don't produce a warning.
