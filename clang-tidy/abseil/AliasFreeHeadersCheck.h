@@ -16,7 +16,8 @@ namespace clang {
 namespace tidy {
 namespace abseil {
 
-/// FIXME: Write a short description.
+/// Finds using declarations in headers and suggests those declarations
+/// be removed.   
 ///
 /// For the user-facing documentation see:
 /// http://clang.llvm.org/extra/clang-tidy/checks/abseil-alias-free-headers.html
