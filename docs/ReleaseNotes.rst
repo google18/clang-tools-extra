@@ -87,6 +87,12 @@ Improvements to clang-tidy
   Finds instances of ``absl::StrSplit()`` or ``absl::MaxSplits()`` where the
   delimiter is a single character string literal and replaces with a character.
 
+- New :doc:`abseil-make-unique
+  <clang-tidy/checks/abseil-make-unique>` check.
+
+  Checks for instances of initializing a `unique_ptr` with a direct call to 
+  `new` and suggests using `absl::make_unique` instead.
+
 - New :doc:`abseil-no-internal-dependencies
   <clang-tidy/checks/abseil-no-internal-dependencies>` check.
 
