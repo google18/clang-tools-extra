@@ -3,11 +3,11 @@
 abseil-alias-free-headers
 =========================
 
-Flags using declarations in header files, and suggests that these aliases be removed.
+Flags ``using`` declarations in header files, and suggests that these aliases be removed.
 
-A using declaration placed in a header file forces users of that header file
+A ``using`` declaration placed in a header file forces users of that header file to
 accept the specified alias. Because of this, using declarations should almost never
 be used in a header file
 
-The style guide  http://google.github.io/styleguide/cppguide.html#Aliases discusses this
-issue in more detail
+The guidelines https://google.github.io/styleguide/cppguide.html#Aliases discuss this
+issue in more detail.
