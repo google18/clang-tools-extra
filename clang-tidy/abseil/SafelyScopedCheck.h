@@ -16,7 +16,7 @@ namespace clang {
 namespace tidy {
 namespace abseil {
 
-/// Detecting using declarations not in a namespace declaration or not in 
+/// Detecting using declarations not in a namespace declaration or not in
 /// the innermost layer of namespace declarations.
 ///
 /// For the user-facing documentation see:
