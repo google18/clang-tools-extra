@@ -5,6 +5,6 @@ namespace foo {
 }
 
 using foo::f;
-// CHECK-MESSAGES: :[[@LINE-1]]:12: warning: convenience aliases in header files are dangerous [abseil-alias-free-headers]
+// CHECK-MESSAGES: :[[@LINE-1]]:12: warning: using declarations should not be included in header files [abseil-alias-free-headers]
 
 void other_function();

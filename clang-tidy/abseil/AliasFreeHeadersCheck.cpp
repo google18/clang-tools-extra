@@ -25,8 +25,7 @@ void AliasFreeHeadersCheck::registerMatchers(MatchFinder *Finder) {
 
 void AliasFreeHeadersCheck::check(const MatchFinder::MatchResult &Result) {
   const auto *MatchedDecl = Result.Nodes.getNodeAs<UsingDecl>("x");
-  diag(MatchedDecl->getLocation(), "convenience aliases in header files are "
-    "dangerous");
+  diag(MatchedDecl->getLocation(), "using declarations should not be included in header files");
 }
 
 } // namespace abseil
