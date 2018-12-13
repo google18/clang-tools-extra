@@ -3,11 +3,11 @@
 abseil-make-unique
 ==================
 
-Checks for instances of initializing a `unique_ptr` with a direct call to  
+Checks for instances of initializing a `unique_ptr` with a direct call to
 `new` and suggests using `absl::make_unique` instead.
 
 Replaces initialization of smart pointers:
-\code 
+\code
   std::unique_ptr<int> ptr = std::unique_ptr<int>(new int(1));
 \endcode
 

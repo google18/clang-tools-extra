@@ -18,14 +18,14 @@ namespace tidy {
 namespace abseil {
 
 /// Replace the pattern:
-/// \code 
+/// \code
 ///   std::unique_ptr<type>(new type(args...))
 /// \endcode
 ///
 /// With the Abseil version:
-/// \code 
+/// \code
 ///   absl::make_unique<type>(args...)
-/// \endcode 
+/// \endcode
 class MakeUniqueCheck : public modernize::MakeSmartPtrCheck {
 public:
   MakeUniqueCheck(StringRef Name, ClangTidyContext *Context);

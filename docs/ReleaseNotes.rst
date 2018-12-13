@@ -90,7 +90,7 @@ Improvements to clang-tidy
 - New :doc:`abseil-make-unique
   <clang-tidy/checks/abseil-make-unique>` check.
 
-  Checks for instances of initializing a `unique_ptr` with a direct call to 
+  Checks for instances of initializing a `unique_ptr` with a direct call to
   `new` and suggests using `absl::make_unique` instead.
 
 - New :doc:`abseil-no-internal-dependencies

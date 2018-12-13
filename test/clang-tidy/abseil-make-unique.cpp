@@ -3,7 +3,7 @@
 // CHECK-FIXES: #include <memory>
 
 namespace std {
-  
+
 template <typename T>
 class default_delete {};
 
@@ -47,10 +47,10 @@ struct Derived : public Base {
   Derived();
 };
 
-int* ReturnPointer();
-void ExpectPointer(std::unique_ptr<int> p);
+int* returnPointer();
+void expectPointer(std::unique_ptr<int> p);
 
-std::unique_ptr<int> MakeAndReturnPointer() {
+std::unique_ptr<int> makeAndReturnPointer() {
   // Make smart pointer in return statement
   return std::unique_ptr<int>(new int(0));
   // CHECK-MESSAGES: :[[@LINE-1]]:10: warning: use absl::make_unique instead [abseil-make-unique]
@@ -115,15 +115,15 @@ void Positives() {
   }
 
   // Create the unique_ptr as a parameter to a function
-  ExpectPointer(std::unique_ptr<int>(new int()));
+  expectPointer(std::unique_ptr<int>(new int()));
   // CHECK-MESSAGES: :[[@LINE-1]]:17: warning: use absl::make_unique instead [abseil-make-unique]
-  // CHECK-FIXES: ExpectPointer(absl::make_unique<int>());
+  // CHECK-FIXES: expectPointer(absl::make_unique<int>());
 }
 
 void Negatives() {
   // Only warn if explicitly allocating a new object
-  std::unique_ptr<int> R = std::unique_ptr<int>(ReturnPointer());
-  R.reset(ReturnPointer());
+  std::unique_ptr<int> R = std::unique_ptr<int>(returnPointer());
+  R.reset(returnPointer());
 
   // Only replace if the template type is same as new type
   auto Pderived = std::unique_ptr<Base>(new Derived());
