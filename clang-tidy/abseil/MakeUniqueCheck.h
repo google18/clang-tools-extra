@@ -31,7 +31,7 @@ public:
   MakeUniqueCheck(StringRef Name, ClangTidyContext *Context);
 
 protected:
-  SmartPtrTypeMatcher getSmartPointerTypeMatcher() const override; 
+  SmartPtrTypeMatcher getSmartPointerTypeMatcher() const override;
   bool isLanguageVersionSupported(const LangOptions &LangOpts) const override;
 };
 
