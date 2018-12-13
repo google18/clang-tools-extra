@@ -32,7 +32,7 @@ public:
 
 protected:
   SmartPtrTypeMatcher getSmartPointerTypeMatcher() const override;
-  
+ 
   bool isLanguageVersionSupported(const LangOptions &LangOpts) const override;
 };
 
