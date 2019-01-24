@@ -1,9 +1,8 @@
 //===--- AST.h - Utility AST functions  -------------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -14,9 +13,9 @@
 #ifndef LLVM_CLANG_TOOLS_EXTRA_CLANGD_AST_H_
 #define LLVM_CLANG_TOOLS_EXTRA_CLANGD_AST_H_
 
+#include "index/Index.h"
 #include "clang/AST/Decl.h"
 #include "clang/Basic/SourceLocation.h"
-#include "index/Index.h"
 
 namespace clang {
 class SourceManager;
@@ -41,6 +40,11 @@ std::string printQualifiedName(const NamedDecl &ND);
 
 /// Returns the first enclosing namespace scope starting from \p DC.
 std::string printNamespaceScope(const DeclContext &DC);
+
+/// Prints unqualified name of the decl for the purpose of displaying it to the
+/// user. Anonymous decls return names of the form "(anonymous {kind})", e.g.
+/// "(anonymous struct)" or "(anonymous namespace)".
+std::string printName(const ASTContext &Ctx, const NamedDecl &ND);
 
 /// Gets the symbol ID for a declaration, if possible.
 llvm::Optional<SymbolID> getSymbolID(const Decl *D);

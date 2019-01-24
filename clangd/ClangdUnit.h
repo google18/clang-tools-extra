@@ -1,15 +1,15 @@
 //===--- ClangdUnit.h --------------------------------------------*- C++-*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_CLANG_TOOLS_EXTRA_CLANGD_CLANGDUNIT_H
 #define LLVM_CLANG_TOOLS_EXTRA_CLANGD_CLANGDUNIT_H
 
+#include "Compiler.h"
 #include "Diagnostics.h"
 #include "FS.h"
 #include "Function.h"
@@ -60,13 +60,6 @@ struct PreambleData {
   std::unique_ptr<PreambleFileStatusCache> StatCache;
 };
 
-/// Information required to run clang, e.g. to parse AST or do code completion.
-struct ParseInputs {
-  tooling::CompileCommand CompileCommand;
-  IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS;
-  std::string Contents;
-};
-
 /// Stores and provides access to parsed AST.
 class ParsedAST {
 public:
@@ -77,7 +70,8 @@ public:
         std::shared_ptr<const PreambleData> Preamble,
         std::unique_ptr<llvm::MemoryBuffer> Buffer,
         std::shared_ptr<PCHContainerOperations> PCHs,
-        IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS);
+        IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
+        const tidy::ClangTidyOptions &ClangTidyOpts);
 
   ParsedAST(ParsedAST &&Other);
   ParsedAST &operator=(ParsedAST &&Other);
@@ -134,10 +128,6 @@ private:
 
 using PreambleParsedCallback =
     std::function<void(ASTContext &, std::shared_ptr<clang::Preprocessor>)>;
-
-/// Builds compiler invocation that could be used to build AST or preamble.
-std::unique_ptr<CompilerInvocation>
-buildCompilerInvocation(const ParseInputs &Inputs);
 
 /// Rebuild the preamble for the new inputs unless the old one can be reused.
 /// If \p OldPreamble can be reused, it is returned unchanged.

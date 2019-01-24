@@ -1,9 +1,8 @@
 //===--- MisplacedWideningCastCheck.cpp - clang-tidy-----------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -65,16 +64,16 @@ static unsigned getMaxCalculationWidth(const ASTContext &Context,
     if (Bop->getOpcode() == BO_Add)
       return std::max(LHSWidth, RHSWidth) + 1;
     if (Bop->getOpcode() == BO_Rem) {
-      llvm::APSInt Val;
-      if (Bop->getRHS()->EvaluateAsInt(Val, Context))
-        return Val.getActiveBits();
+      Expr::EvalResult Result;
+      if (Bop->getRHS()->EvaluateAsInt(Result, Context))
+        return Result.Val.getInt().getActiveBits();
     } else if (Bop->getOpcode() == BO_Shl) {
-      llvm::APSInt Bits;
-      if (Bop->getRHS()->EvaluateAsInt(Bits, Context)) {
+      Expr::EvalResult Result;
+      if (Bop->getRHS()->EvaluateAsInt(Result, Context)) {
         // We don't handle negative values and large values well. It is assumed
         // that compiler warnings are written for such values so the user will
         // fix that.
-        return LHSWidth + Bits.getExtValue();
+        return LHSWidth + Result.Val.getInt().getExtValue();
       }
 
       // Unknown bitcount, assume there is truncation.
@@ -213,8 +212,9 @@ void MisplacedWideningCastCheck::check(const MatchFinder::MatchResult &Result) {
         dyn_cast<BuiltinType>(CastType->getUnqualifiedDesugaredType());
     const auto *CalcBuiltinType =
         dyn_cast<BuiltinType>(CalcType->getUnqualifiedDesugaredType());
-    if (CastBuiltinType && CalcBuiltinType &&
-        !isFirstWider(CastBuiltinType->getKind(), CalcBuiltinType->getKind()))
+    if (!CastBuiltinType || !CalcBuiltinType)
+      return;
+    if (!isFirstWider(CastBuiltinType->getKind(), CalcBuiltinType->getKind()))
       return;
   }
 
