@@ -1,9 +1,8 @@
 //===--- Cancellation.h -------------------------------------------*-C++-*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 // Cancellation mechanism for long-running tasks.
@@ -79,7 +78,7 @@ std::pair<Context, Canceler> cancelableTask();
 /// True if the current context is within a cancelable task which was cancelled.
 /// Always false if there is no active cancelable task.
 /// This isn't free (context lookup) - don't call it in a tight loop.
-bool isCancelled();
+bool isCancelled(const Context &Ctx = Context::current());
 
 /// Conventional error when no result is returned due to cancellation.
 class CancelledError : public llvm::ErrorInfo<CancelledError> {

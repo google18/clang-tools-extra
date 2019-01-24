@@ -1,9 +1,8 @@
 //===--- NonPrivateMemberVariablesInClassesCheck.cpp - clang-tidy ---------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -23,8 +22,8 @@ AST_MATCHER(CXXRecordDecl, hasMethods) {
   return std::distance(Node.method_begin(), Node.method_end()) != 0;
 }
 
-AST_MATCHER(CXXRecordDecl, hasNonStaticMethod) {
-  return hasMethod(unless(isStaticStorageClass()))
+AST_MATCHER(CXXRecordDecl, hasNonStaticNonImplicitMethod) {
+  return hasMethod(unless(anyOf(isStaticStorageClass(), isImplicit())))
       .matches(Node, Finder, Builder);
 }
 
@@ -59,13 +58,6 @@ void NonPrivateMemberVariablesInClassesCheck::registerMatchers(
       allOf(boolean(IgnoreClassesWithAllMemberVariablesBeingPublic),
             unless(hasNonPublicMemberVariable()));
 
-  // We only want the records that not only contain the mutable data (non-static
-  // member variables), but also have some logic (non-static member functions).
-  // We may optionally ignore records where all the member variables are public.
-  auto RecordIsInteresting =
-      allOf(anyOf(isStruct(), isClass()), hasMethods(), hasNonStaticMethod(),
-            unless(ShouldIgnoreRecord));
-
   // There are three visibility types: public, protected, private.
   // If we are ok with public fields, then we only want to complain about
   // protected fields, else we want to complain about all non-private fields.
@@ -73,7 +65,13 @@ void NonPrivateMemberVariablesInClassesCheck::registerMatchers(
   auto InterestingField = fieldDecl(
       IgnorePublicMemberVariables ? isProtected() : unless(isPrivate()));
 
-  Finder->addMatcher(cxxRecordDecl(RecordIsInteresting,
+  // We only want the records that not only contain the mutable data (non-static
+  // member variables), but also have some logic (non-static, non-implicit
+  // member functions).  We may optionally ignore records where all the member
+  // variables are public.
+  Finder->addMatcher(cxxRecordDecl(anyOf(isStruct(), isClass()), hasMethods(),
+                                   hasNonStaticNonImplicitMethod(),
+                                   unless(ShouldIgnoreRecord),
                                    forEach(InterestingField.bind("field")))
                          .bind("record"),
                      this);

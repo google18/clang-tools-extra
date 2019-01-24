@@ -1,9 +1,8 @@
 //===--- OwningMemoryCheck.cpp - clang-tidy--------------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -87,36 +86,34 @@ void OwningMemoryCheck::registerMatchers(MatchFinder *Finder) {
   // resources. This check assumes that all pointer arguments of a legacy
   // functions shall be 'gsl::owner<>'.
   Finder->addMatcher(
-      callExpr(
-          allOf(callee(LegacyOwnerConsumers),
-                hasAnyArgument(allOf(unless(ignoringImpCasts(ConsideredOwner)),
-                                     hasType(pointerType())))))
+      callExpr(callee(LegacyOwnerConsumers),
+               hasAnyArgument(expr(unless(ignoringImpCasts(ConsideredOwner)),
+                                   hasType(pointerType()))))
           .bind("legacy_consumer"),
       this);
 
   // Matching assignment to owners, with the rhs not being an owner nor creating
   // one.
-  Finder->addMatcher(binaryOperator(allOf(matchers::isAssignmentOperator(),
-                                          hasLHS(IsOwnerType),
-                                          hasRHS(unless(ConsideredOwner))))
+  Finder->addMatcher(binaryOperator(matchers::isAssignmentOperator(),
+                                    hasLHS(IsOwnerType),
+                                    hasRHS(unless(ConsideredOwner)))
                          .bind("owner_assignment"),
                      this);
 
   // Matching initialization of owners with non-owners, nor creating owners.
   Finder->addMatcher(
-      namedDecl(
-          varDecl(allOf(hasInitializer(unless(ConsideredOwner)), IsOwnerType))
-              .bind("owner_initialization")),
+      namedDecl(varDecl(hasInitializer(unless(ConsideredOwner)), IsOwnerType)
+                    .bind("owner_initialization")),
       this);
 
   const auto HasConstructorInitializerForOwner =
       has(cxxConstructorDecl(forEachConstructorInitializer(
-          cxxCtorInitializer(allOf(isMemberInitializer(), forField(IsOwnerType),
-                                   withInitializer(
-                                       // Avoid templatesdeclaration with
-                                       // excluding parenListExpr.
-                                       allOf(unless(ConsideredOwner),
-                                             unless(parenListExpr())))))
+          cxxCtorInitializer(
+              isMemberInitializer(), forField(IsOwnerType),
+              withInitializer(
+                  // Avoid templatesdeclaration with
+                  // excluding parenListExpr.
+                  allOf(unless(ConsideredOwner), unless(parenListExpr()))))
               .bind("owner_member_initializer"))));
 
   // Match class member initialization that expects owners, but does not get
@@ -125,11 +122,11 @@ void OwningMemoryCheck::registerMatchers(MatchFinder *Finder) {
 
   // Matching on assignment operations where the RHS is a newly created owner,
   // but the LHS is not an owner.
-  Finder->addMatcher(
-      binaryOperator(allOf(matchers::isAssignmentOperator(),
-                           hasLHS(unless(IsOwnerType)), hasRHS(CreatesOwner)))
-          .bind("bad_owner_creation_assignment"),
-      this);
+  Finder->addMatcher(binaryOperator(matchers::isAssignmentOperator(),
+                                    hasLHS(unless(IsOwnerType)),
+                                    hasRHS(CreatesOwner))
+                         .bind("bad_owner_creation_assignment"),
+                     this);
 
   // Matching on initialization operations where the initial value is a newly
   // created owner, but the LHS is not an owner.
@@ -160,10 +157,9 @@ void OwningMemoryCheck::registerMatchers(MatchFinder *Finder) {
   // Matching on functions, that return an owner/resource, but don't declare
   // their return type as owner.
   Finder->addMatcher(
-      functionDecl(
-          allOf(hasDescendant(returnStmt(hasReturnValue(ConsideredOwner))
-                                  .bind("bad_owner_return")),
-                unless(returns(qualType(hasDeclaration(OwnerDecl))))))
+      functionDecl(hasDescendant(returnStmt(hasReturnValue(ConsideredOwner))
+                                     .bind("bad_owner_return")),
+                   unless(returns(qualType(hasDeclaration(OwnerDecl)))))
           .bind("function_decl"),
       this);
 
@@ -171,10 +167,9 @@ void OwningMemoryCheck::registerMatchers(MatchFinder *Finder) {
   // destructor to properly release the owner.
   Finder->addMatcher(
       cxxRecordDecl(
-          allOf(
-              has(fieldDecl(IsOwnerType).bind("undestructed_owner_member")),
-              anyOf(unless(has(cxxDestructorDecl())),
-                    has(cxxDestructorDecl(anyOf(isDefaulted(), isDeleted()))))))
+          has(fieldDecl(IsOwnerType).bind("undestructed_owner_member")),
+          anyOf(unless(has(cxxDestructorDecl())),
+                has(cxxDestructorDecl(anyOf(isDefaulted(), isDeleted())))))
           .bind("non_destructor_class"),
       this);
 }

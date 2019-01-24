@@ -1,9 +1,8 @@
 //===--- GoogleTidyModule.cpp - clang-tidy --------------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -18,6 +17,7 @@
 #include "DefaultArgumentsCheck.h"
 #include "ExplicitConstructorCheck.h"
 #include "ExplicitMakePairCheck.h"
+#include "FunctionNamingCheck.h"
 #include "GlobalNamesInHeadersCheck.h"
 #include "GlobalVariableDeclarationCheck.h"
 #include "IntegerTypesCheck.h"
@@ -50,6 +50,8 @@ class GoogleModule : public ClangTidyModule {
         "google-global-names-in-headers");
     CheckFactories.registerCheck<objc::AvoidThrowingObjCExceptionCheck>(
         "google-objc-avoid-throwing-exception");
+    CheckFactories.registerCheck<objc::FunctionNamingCheck>(
+        "google-objc-function-naming");
     CheckFactories.registerCheck<objc::GlobalVariableDeclarationCheck>(
         "google-objc-global-variable-declaration");
     CheckFactories.registerCheck<runtime::IntegerTypesCheck>(

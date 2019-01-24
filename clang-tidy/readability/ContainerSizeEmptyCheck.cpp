@@ -1,9 +1,8 @@
 //===--- ContainerSizeEmptyCheck.cpp - clang-tidy -------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 #include "ContainerSizeEmptyCheck.h"
@@ -213,6 +212,14 @@ void ContainerSizeEmptyCheck::check(const MatchFinder::MatchResult &Result) {
   }
 
   const auto *Container = Result.Nodes.getNodeAs<NamedDecl>("container");
+  if (const auto *CTS = dyn_cast<ClassTemplateSpecializationDecl>(Container)) {
+    // The definition of the empty() method is the same for all implicit
+    // instantiations. In order to avoid duplicate or inconsistent warnings
+    // (depending on how deduplication is done), we use the same class name
+    // for all implicit instantiations of a template.
+    if (CTS->getSpecializationKind() == TSK_ImplicitInstantiation)
+      Container = CTS->getSpecializedTemplate();
+  }
   const auto *Empty = Result.Nodes.getNodeAs<FunctionDecl>("empty");
 
   diag(Empty->getLocation(), "method %0::empty() defined here",

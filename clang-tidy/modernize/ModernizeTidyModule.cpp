@@ -1,9 +1,8 @@
 //===--- ModernizeTidyModule.cpp - clang-tidy -----------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -11,6 +10,7 @@
 #include "../ClangTidyModule.h"
 #include "../ClangTidyModuleRegistry.h"
 #include "AvoidBindCheck.h"
+#include "AvoidCArraysCheck.h"
 #include "ConcatNestedNamespacesCheck.h"
 #include "DeprecatedHeadersCheck.h"
 #include "DeprecatedIosBaseAliasesCheck.h"
@@ -31,6 +31,7 @@
 #include "UseEmplaceCheck.h"
 #include "UseEqualsDefaultCheck.h"
 #include "UseEqualsDeleteCheck.h"
+#include "UseNodiscardCheck.h"
 #include "UseNoexceptCheck.h"
 #include "UseNullptrCheck.h"
 #include "UseOverrideCheck.h"
@@ -48,6 +49,7 @@ class ModernizeModule : public ClangTidyModule {
 public:
   void addCheckFactories(ClangTidyCheckFactories &CheckFactories) override {
     CheckFactories.registerCheck<AvoidBindCheck>("modernize-avoid-bind");
+    CheckFactories.registerCheck<AvoidCArraysCheck>("modernize-avoid-c-arrays");
     CheckFactories.registerCheck<ConcatNestedNamespacesCheck>(
         "modernize-concat-nested-namespaces");
     CheckFactories.registerCheck<DeprecatedHeadersCheck>(
@@ -80,6 +82,8 @@ public:
     CheckFactories.registerCheck<UseEqualsDefaultCheck>("modernize-use-equals-default");
     CheckFactories.registerCheck<UseEqualsDeleteCheck>(
         "modernize-use-equals-delete");
+    CheckFactories.registerCheck<UseNodiscardCheck>(
+        "modernize-use-nodiscard");
     CheckFactories.registerCheck<UseNoexceptCheck>("modernize-use-noexcept");
     CheckFactories.registerCheck<UseNullptrCheck>("modernize-use-nullptr");
     CheckFactories.registerCheck<UseOverrideCheck>("modernize-use-override");

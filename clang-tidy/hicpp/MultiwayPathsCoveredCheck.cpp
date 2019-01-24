@@ -1,9 +1,8 @@
 //===--- MultiwayPathsCoveredCheck.cpp - clang-tidy------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -26,7 +25,7 @@ void MultiwayPathsCoveredCheck::storeOptions(
 void MultiwayPathsCoveredCheck::registerMatchers(MatchFinder *Finder) {
   Finder->addMatcher(
       switchStmt(
-          hasCondition(allOf(
+          hasCondition(expr(
               // Match on switch statements that have either a bit-field or
               // an integer condition. The ordering in 'anyOf()' is
               // important because the last condition is the most general.
@@ -43,10 +42,9 @@ void MultiwayPathsCoveredCheck::registerMatchers(MatchFinder *Finder) {
 
   // This option is noisy, therefore matching is configurable.
   if (WarnOnMissingElse) {
-    Finder->addMatcher(
-        ifStmt(allOf(hasParent(ifStmt()), unless(hasElse(anything()))))
-            .bind("else-if"),
-        this);
+    Finder->addMatcher(ifStmt(hasParent(ifStmt()), unless(hasElse(anything())))
+                           .bind("else-if"),
+                       this);
   }
 }
 
