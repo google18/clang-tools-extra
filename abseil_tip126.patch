@@ -1,0 +1,826 @@
+diff --git a/clang-tidy/abseil/AbseilTidyModule.cpp b/clang-tidy/abseil/AbseilTidyModule.cpp
+index e02b1e0e..92d3d496 100644
+--- a/clang-tidy/abseil/AbseilTidyModule.cpp
++++ b/clang-tidy/abseil/AbseilTidyModule.cpp
+@@ -1,58 +1,61 @@
+ //===------- AbseilTidyModule.cpp - clang-tidy ----------------------------===//
+ //
+ //                     The LLVM Compiler Infrastructure
+ //
+ // This file is distributed under the University of Illinois Open Source
+ // License. See LICENSE.TXT for details.
+ //
+ //===----------------------------------------------------------------------===//
+ 
+ #include "../ClangTidy.h"
+ #include "../ClangTidyModule.h"
+ #include "../ClangTidyModuleRegistry.h"
+ #include "DurationDivisionCheck.h"
+ #include "DurationFactoryFloatCheck.h"
+ #include "FasterStrsplitDelimiterCheck.h"
++#include "MakeUniqueCheck.h"
+ #include "NoInternalDependenciesCheck.h"
+ #include "NoNamespaceCheck.h"
+ #include "RedundantStrcatCallsCheck.h"
+ #include "StringFindStartswithCheck.h"
+ #include "StrCatAppendCheck.h"
+ 
+ namespace clang {
+ namespace tidy {
+ namespace abseil {
+ 
+ class AbseilModule : public ClangTidyModule {
+ public:
+   void addCheckFactories(ClangTidyCheckFactories &CheckFactories) override {
+     CheckFactories.registerCheck<DurationDivisionCheck>(
+         "abseil-duration-division");
+     CheckFactories.registerCheck<DurationFactoryFloatCheck>(
+         "abseil-duration-factory-float");
+     CheckFactories.registerCheck<FasterStrsplitDelimiterCheck>(
+         "abseil-faster-strsplit-delimiter");
++    CheckFactories.registerCheck<MakeUniqueCheck>(
++        "abseil-make-unique");
+     CheckFactories.registerCheck<NoInternalDependenciesCheck>(
+         "abseil-no-internal-dependencies");
+     CheckFactories.registerCheck<NoNamespaceCheck>("abseil-no-namespace");
+     CheckFactories.registerCheck<RedundantStrcatCallsCheck>(
+         "abseil-redundant-strcat-calls");
+     CheckFactories.registerCheck<StrCatAppendCheck>(
+         "abseil-str-cat-append");
+     CheckFactories.registerCheck<StringFindStartswithCheck>(
+         "abseil-string-find-startswith");
+   }
+ };
+ 
+ // Register the AbseilModule using this statically initialized variable.
+ static ClangTidyModuleRegistry::Add<AbseilModule> X("abseil-module",
+                                                     "Add Abseil checks.");
+ 
+ } // namespace abseil
+ 
+ // This anchor is used to force the linker to link in the generated object file
+ // and thus register the AbseilModule.
+ volatile int AbseilModuleAnchorSource = 0;
+ 
+ } // namespace tidy
+ } // namespace clang
+diff --git a/clang-tidy/abseil/CMakeLists.txt b/clang-tidy/abseil/CMakeLists.txt
+index 48389d7f..8e973bd1 100644
+--- a/clang-tidy/abseil/CMakeLists.txt
++++ b/clang-tidy/abseil/CMakeLists.txt
+@@ -1,22 +1,23 @@
+ set(LLVM_LINK_COMPONENTS support)
+ 
+ add_clang_library(clangTidyAbseilModule
+   AbseilTidyModule.cpp
+   DurationDivisionCheck.cpp
+   DurationFactoryFloatCheck.cpp
+   FasterStrsplitDelimiterCheck.cpp
++  MakeUniqueCheck.cpp
+   NoInternalDependenciesCheck.cpp
+   NoNamespaceCheck.cpp
+   RedundantStrcatCallsCheck.cpp
+   StrCatAppendCheck.cpp
+   StringFindStartswithCheck.cpp
+ 
+   LINK_LIBS
+   clangAST
+   clangASTMatchers
+   clangBasic
+   clangLex
+   clangTidy
+   clangTidyUtils
+   clangTooling
+   )
+diff --git a/clang-tidy/abseil/MakeUniqueCheck.cpp b/clang-tidy/abseil/MakeUniqueCheck.cpp
+new file mode 100644
+index 00000000..1e7de174
+--- /dev/null
++++ b/clang-tidy/abseil/MakeUniqueCheck.cpp
+@@ -0,0 +1,48 @@
++//===--- MakeUniqueCheck.cpp - clang-tidy ---------------------------------===//
++//
++//                     The LLVM Compiler Infrastructure
++//
++// This file is distributed under the University of Illinois Open Source
++// License. See LICENSE.TXT for details.
++//
++//===----------------------------------------------------------------------===//
++
++#include "MakeUniqueCheck.h"
++#include "clang/AST/ASTContext.h"
++#include "clang/ASTMatchers/ASTMatchFinder.h"
++
++using namespace clang::ast_matchers;
++
++namespace clang {
++namespace tidy {
++namespace abseil {
++
++MakeUniqueCheck::MakeUniqueCheck(StringRef Name,
++                                 clang::tidy::ClangTidyContext *Context)
++    : MakeSmartPtrCheck(Name, Context, "absl::make_unique") {}
++
++MakeUniqueCheck::SmartPtrTypeMatcher
++MakeUniqueCheck::getSmartPointerTypeMatcher() const {
++  return qualType(hasUnqualifiedDesugaredType(
++      recordType(hasDeclaration(classTemplateSpecializationDecl(
++          hasName("::std::unique_ptr"), templateArgumentCountIs(2),
++          hasTemplateArgument(
++              0, templateArgument(refersToType(qualType().bind(PointerType)))),
++          hasTemplateArgument(
++              1, templateArgument(refersToType(
++                     qualType(hasDeclaration(classTemplateSpecializationDecl(
++                         hasName("::std::default_delete"),
++                         templateArgumentCountIs(1),
++                         hasTemplateArgument(
++                             0, templateArgument(refersToType(qualType(
++                                    equalsBoundNode(PointerType))))))))))))))));
++}
++
++bool MakeUniqueCheck::isLanguageVersionSupported(
++    const LangOptions &LangOpts) const {
++  return LangOpts.CPlusPlus11;
++}
++
++} // namespace abseil
++} // namespace tidy
++} // namespace clang
+diff --git a/clang-tidy/abseil/MakeUniqueCheck.h b/clang-tidy/abseil/MakeUniqueCheck.h
+new file mode 100644
+index 00000000..47091ece
+--- /dev/null
++++ b/clang-tidy/abseil/MakeUniqueCheck.h
+@@ -0,0 +1,42 @@
++//===--- MakeUniqueCheck.h - clang-tidy -------------------------*- C++ -*-===//
++//
++//                     The LLVM Compiler Infrastructure
++//
++// This file is distributed under the University of Illinois Open Source
++// License. See LICENSE.TXT for details.
++//
++//===----------------------------------------------------------------------===//
++
++#ifndef LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_ABSEIL_MAKEUNIQUECHECK_H
++#define LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_ABSEIL_MAKEUNIQUECHECK_H
++
++#include "../ClangTidy.h"
++#include "../modernize/MakeSmartPtrCheck.h"
++
++namespace clang {
++namespace tidy {
++namespace abseil {
++
++/// Replace the pattern:
++/// \code
++///   std::unique_ptr<type>(new type(args...))
++/// \endcode
++///
++/// With the Abseil version:
++/// \code
++///   absl::make_unique<type>(args...)
++/// \endcode
++class MakeUniqueCheck : public modernize::MakeSmartPtrCheck {
++public:
++  MakeUniqueCheck(StringRef Name, ClangTidyContext *Context);
++
++protected:
++  SmartPtrTypeMatcher getSmartPointerTypeMatcher() const override;
++  bool isLanguageVersionSupported(const LangOptions &LangOpts) const override;
++};
++
++} // namespace abseil
++} // namespace tidy
++} // namespace clang
++
++#endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_ABSEIL_MAKEUNIQUECHECK_H
+diff --git a/docs/ReleaseNotes.rst b/docs/ReleaseNotes.rst
+index 45dffb92..ff06b127 100644
+--- a/docs/ReleaseNotes.rst
++++ b/docs/ReleaseNotes.rst
+@@ -1,193 +1,199 @@
+ ===================================================
+ Extra Clang Tools 8.0.0 (In-Progress) Release Notes
+ ===================================================
+ 
+ .. contents::
+    :local:
+    :depth: 3
+ 
+ Written by the `LLVM Team <https://llvm.org/>`_
+ 
+ .. warning::
+ 
+    These are in-progress notes for the upcoming Extra Clang Tools 8 release.
+    Release notes for previous releases can be found on
+    `the Download Page <https://releases.llvm.org/download.html>`_.
+ 
+ Introduction
+ ============
+ 
+ This document contains the release notes for the Extra Clang Tools, part of the
+ Clang release 8.0.0. Here we describe the status of the Extra Clang Tools in
+ some detail, including major improvements from the previous release and new
+ feature work. All LLVM releases may be downloaded from the `LLVM releases web
+ site <https://llvm.org/releases/>`_.
+ 
+ For more information about Clang or LLVM, including information about
+ the latest release, please see the `Clang Web Site <https://clang.llvm.org>`_ or
+ the `LLVM Web Site <https://llvm.org>`_.
+ 
+ Note that if you are reading this file from a Subversion checkout or the
+ main Clang web page, this document applies to the *next* release, not
+ the current one. To see the release notes for a specific release, please
+ see the `releases page <https://llvm.org/releases/>`_.
+ 
+ What's New in Extra Clang Tools 8.0.0?
+ ======================================
+ 
+ Some of the major new features and improvements to Extra Clang Tools are listed
+ here. Generic improvements to Extra Clang Tools as a whole or to its underlying
+ infrastructure are described first, followed by tool-specific sections.
+ 
+ Major New Features
+ ------------------
+ 
+ ...
+ 
+ Improvements to clangd
+ ----------------------
+ 
+ The improvements are...
+ 
+ Improvements to clang-doc
+ -------------------------
+ 
+ The improvements are...
+ 
+ Improvements to clang-query
+ ---------------------------
+ 
+ The improvements are...
+ 
+ Improvements to clang-rename
+ ----------------------------
+ 
+ The improvements are...
+ 
+ Improvements to clang-tidy
+ --------------------------
+ 
+ - New :doc:`abseil-duration-division
+   <clang-tidy/checks/abseil-duration-division>` check.
+ 
+   Checks for uses of ``absl::Duration`` division that is done in a
+   floating-point context, and recommends the use of a function that
+   returns a floating-point value.
+ 
+ - New :doc:`abseil-duration-factory-float
+   <clang-tidy/checks/abseil-duration-factory-float>` check.
+ 
+   Checks for cases where the floating-point overloads of various
+   ``absl::Duration`` factory functions are called when the more-efficient
+   integer versions could be used instead.
+ 
+ - New :doc:`abseil-faster-strsplit-delimiter
+   <clang-tidy/checks/abseil-faster-strsplit-delimiter>` check.
+ 
+   Finds instances of ``absl::StrSplit()`` or ``absl::MaxSplits()`` where the
+   delimiter is a single character string literal and replaces with a character.
+ 
++- New :doc:`abseil-make-unique
++  <clang-tidy/checks/abseil-make-unique>` check.
++
++  Checks for instances of initializing a `unique_ptr` with a direct call to
++  `new` and suggests using `absl::make_unique` instead.
++
+ - New :doc:`abseil-no-internal-dependencies
+   <clang-tidy/checks/abseil-no-internal-dependencies>` check.
+ 
+   Gives a warning if code using Abseil depends on internal details.
+ 
+ - New :doc:`abseil-no-namespace
+   <clang-tidy/checks/abseil-no-namespace>` check.
+ 
+   Ensures code does not open ``namespace absl`` as that violates Abseil's
+   compatibility guidelines.
+ 
+ - New :doc:`abseil-redundant-strcat-calls
+   <clang-tidy/checks/abseil-redundant-strcat-calls>` check.
+ 
+   Suggests removal of unnecessary calls to ``absl::StrCat`` when the result is
+   being passed to another ``absl::StrCat`` or ``absl::StrAppend``.
+ 
+ - New :doc:`abseil-str-cat-append
+   <clang-tidy/checks/abseil-str-cat-append>` check.
+ 
+   Flags uses of ``absl::StrCat()`` to append to a ``std::string``. Suggests
+   ``absl::StrAppend()`` should be used instead.
+ 
+ - New :doc:`cppcoreguidelines-macro-usage
+   <clang-tidy/checks/cppcoreguidelines-macro-usage>` check.
+ 
+   Finds macro usage that is considered problematic because better language
+   constructs exist for the task.
+ 
+ - New :doc:`misc-non-private-member-variables-in-classes
+   <clang-tidy/checks/misc-non-private-member-variables-in-classes>` check.
+ 
+   Finds classes that not only contain the data (non-static member variables),
+   but also have logic (non-static member functions), and diagnoses all member
+   variables that have any other scope other than ``private``.
+ 
+ - New :doc:`modernize-concat-nested-namespaces
+   <clang-tidy/checks/modernize-concat-nested-namespaces>` check.
+ 
+   Checks for uses of nested namespaces in the form of
+   ``namespace a { namespace b { ... }}`` and offers change to
+   syntax introduced in C++17 standard: ``namespace a::b { ... }``.
+ 
+ - New :doc:`modernize-deprecated-ios-base-aliases
+   <clang-tidy/checks/modernize-deprecated-ios-base-aliases>` check.
+ 
+   Detects usage of the deprecated member types of ``std::ios_base`` and replaces
+   those that have a non-deprecated equivalent.
+ 
+ - New :doc:`readability-isolate-decl
+   <clang-tidy/checks/readability-isolate-declaration>` check.
+ 
+   Detects local variable declarations declaring more than one variable and
+   tries to refactor the code to one statement per declaration.
+ 
+ - New :doc:`readability-const-return-type
+   <clang-tidy/checks/readability-const-return-type>` check.
+ 
+   Checks for functions with a ``const``-qualified return type and recommends
+   removal of the ``const`` keyword.
+ 
+ - New :doc:`readability-magic-numbers
+   <clang-tidy/checks/readability-magic-numbers>` check.
+ 
+   Detects usage of magic numbers, numbers that are used as literals instead of
+   introduced via constants or symbols.
+ 
+ - New :doc:`readability-uppercase-literal-suffix
+   <clang-tidy/checks/readability-uppercase-literal-suffix>` check.
+ 
+   Detects when the integral literal or floating point literal has non-uppercase
+   suffix, and suggests to make the suffix uppercase. The list of destination
+   suffixes can be optionally provided.
+ 
+ - New alias :doc:`cert-dcl16-c
+   <clang-tidy/checks/cert-dcl16-c>` to :doc:`readability-uppercase-literal-suffix
+   <clang-tidy/checks/readability-uppercase-literal-suffix>`
+   added.
+ 
+ - New alias :doc:`cppcoreguidelines-non-private-member-variables-in-classes
+   <clang-tidy/checks/cppcoreguidelines-non-private-member-variables-in-classes>`
+   to :doc:`misc-non-private-member-variables-in-classes
+   <clang-tidy/checks/misc-non-private-member-variables-in-classes>`
+   added.
+ 
+ - New alias :doc:`hicpp-uppercase-literal-suffix
+   <clang-tidy/checks/hicpp-uppercase-literal-suffix>` to
+   :doc:`readability-uppercase-literal-suffix
+   <clang-tidy/checks/readability-uppercase-literal-suffix>`
+   added.
+ 
+ - The :doc:`readability-redundant-smartptr-get
+   <clang-tidy/checks/readability-redundant-smartptr-get>` check does not warn
+   about calls inside macros anymore by default.
+ 
+ Improvements to include-fixer
+ -----------------------------
+ 
+ The improvements are...
+ 
+ Improvements to modularize
+ --------------------------
+ 
+ The improvements are...
+diff --git a/docs/clang-tidy/checks/abseil-make-unique.rst b/docs/clang-tidy/checks/abseil-make-unique.rst
+new file mode 100644
+index 00000000..aa4e16d0
+--- /dev/null
++++ b/docs/clang-tidy/checks/abseil-make-unique.rst
+@@ -0,0 +1,19 @@
++.. title:: clang-tidy - abseil-make-unique
++
++abseil-make-unique
++==================
++
++Checks for instances of initializing a `unique_ptr` with a direct call to
++`new` and suggests using `absl::make_unique` instead.
++
++Replaces initialization of smart pointers:
++\code
++  std::unique_ptr<int> ptr = std::unique_ptr<int>(new int(1));
++\endcode
++
++with the preferred usage:
++\code
++  std::unique_ptr<int> ptr = absl::make_unique<int>(1);
++\endcode
++
++per the Abseil tips and guidelines at https://abseil.io/tips/126.
+diff --git a/docs/clang-tidy/checks/list.rst b/docs/clang-tidy/checks/list.rst
+index f33130b5..98ae6367 100644
+--- a/docs/clang-tidy/checks/list.rst
++++ b/docs/clang-tidy/checks/list.rst
+@@ -1,257 +1,258 @@
+ .. title:: clang-tidy - Clang-Tidy Checks
+ 
+ Clang-Tidy Checks
+ =================
+ 
+ .. toctree::
+    abseil-duration-division
+    abseil-duration-factory-float
+    abseil-faster-strsplit-delimiter
++   abseil-make-unique
+    abseil-no-internal-dependencies
+    abseil-no-namespace
+    abseil-redundant-strcat-calls
+-   abseil-string-find-startswith
+    abseil-str-cat-append
++   abseil-string-find-startswith
+    android-cloexec-accept
+    android-cloexec-accept4
+    android-cloexec-creat
+    android-cloexec-dup
+    android-cloexec-epoll-create
+    android-cloexec-epoll-create1
+    android-cloexec-fopen
+    android-cloexec-inotify-init
+    android-cloexec-inotify-init1
+    android-cloexec-memfd-create
+    android-cloexec-open
+    android-cloexec-socket
+    android-comparison-in-temp-failure-retry
+    boost-use-to-string
+    bugprone-argument-comment
+    bugprone-assert-side-effect
+    bugprone-bool-pointer-implicit-conversion
+    bugprone-copy-constructor-init
+    bugprone-dangling-handle
+    bugprone-exception-escape
+    bugprone-fold-init-type
+    bugprone-forward-declaration-namespace
+    bugprone-forwarding-reference-overload
+    bugprone-inaccurate-erase
+    bugprone-incorrect-roundings
+    bugprone-integer-division
+    bugprone-lambda-function-name
+    bugprone-macro-parentheses
+    bugprone-macro-repeated-side-effects
+    bugprone-misplaced-operator-in-strlen-in-alloc
+    bugprone-misplaced-widening-cast
+    bugprone-move-forwarding-reference
+    bugprone-multiple-statement-macro
+    bugprone-parent-virtual-call
+    bugprone-sizeof-container
+    bugprone-sizeof-expression
+    bugprone-string-constructor
+    bugprone-string-integer-assignment
+    bugprone-string-literal-with-embedded-nul
+    bugprone-suspicious-enum-usage
+    bugprone-suspicious-memset-usage
+    bugprone-suspicious-missing-comma
+    bugprone-suspicious-semicolon
+    bugprone-suspicious-string-compare
+    bugprone-swapped-arguments
+    bugprone-terminating-continue
+    bugprone-throw-keyword-missing
+    bugprone-undefined-memory-manipulation
+    bugprone-undelegated-constructor
+    bugprone-unused-raii
+    bugprone-unused-return-value
+    bugprone-use-after-move
+    bugprone-virtual-near-miss
+    cert-dcl03-c (redirects to misc-static-assert) <cert-dcl03-c>
+    cert-dcl16-c (redirects to readability-uppercase-literal-suffix) <cert-dcl16-c>
+    cert-dcl21-cpp
+    cert-dcl50-cpp
+    cert-dcl54-cpp (redirects to misc-new-delete-overloads) <cert-dcl54-cpp>
+    cert-dcl58-cpp
+    cert-dcl59-cpp (redirects to google-build-namespaces) <cert-dcl59-cpp>
+    cert-env33-c
+    cert-err09-cpp (redirects to misc-throw-by-value-catch-by-reference) <cert-err09-cpp>
+    cert-err34-c
+    cert-err52-cpp
+    cert-err58-cpp
+    cert-err60-cpp
+    cert-err61-cpp (redirects to misc-throw-by-value-catch-by-reference) <cert-err61-cpp>
+    cert-fio38-c (redirects to misc-non-copyable-objects) <cert-fio38-c>
+    cert-flp30-c
+    cert-msc30-c (redirects to cert-msc50-cpp) <cert-msc30-c>
+    cert-msc32-c (redirects to cert-msc51-cpp) <cert-msc32-c>
+    cert-msc50-cpp
+    cert-msc51-cpp
+    cert-oop11-cpp (redirects to performance-move-constructor-init) <cert-oop11-cpp>
+    cppcoreguidelines-avoid-goto
+    cppcoreguidelines-avoid-magic-numbers (redirects to readability-magic-numbers) <cppcoreguidelines-avoid-magic-numbers>
+    cppcoreguidelines-c-copy-assignment-signature (redirects to misc-unconventional-assign-operator) <cppcoreguidelines-c-copy-assignment-signature>
+    cppcoreguidelines-interfaces-global-init
+    cppcoreguidelines-macro-usage
+    cppcoreguidelines-narrowing-conversions
+    cppcoreguidelines-no-malloc
+    cppcoreguidelines-non-private-member-variables-in-classes (redirects to misc-non-private-member-variables-in-classes) <cppcoreguidelines-non-private-member-variables-in-classes>
+    cppcoreguidelines-owning-memory
+    cppcoreguidelines-pro-bounds-array-to-pointer-decay
+    cppcoreguidelines-pro-bounds-constant-array-index
+    cppcoreguidelines-pro-bounds-pointer-arithmetic
+    cppcoreguidelines-pro-type-const-cast
+    cppcoreguidelines-pro-type-cstyle-cast
+    cppcoreguidelines-pro-type-member-init
+    cppcoreguidelines-pro-type-reinterpret-cast
+    cppcoreguidelines-pro-type-static-cast-downcast
+    cppcoreguidelines-pro-type-union-access
+    cppcoreguidelines-pro-type-vararg
+    cppcoreguidelines-slicing
+    cppcoreguidelines-special-member-functions
+    fuchsia-default-arguments
+    fuchsia-header-anon-namespaces (redirects to google-build-namespaces) <fuchsia-header-anon-namespaces>
+    fuchsia-multiple-inheritance
+    fuchsia-overloaded-operator
+    fuchsia-restrict-system-includes
+    fuchsia-statically-constructed-objects
+    fuchsia-trailing-return
+    fuchsia-virtual-inheritance
+    google-build-explicit-make-pair
+    google-build-namespaces
+    google-build-using-namespace
+    google-default-arguments
+    google-explicit-constructor
+    google-global-names-in-headers
+    google-objc-avoid-throwing-exception
+    google-objc-global-variable-declaration
+    google-readability-braces-around-statements (redirects to readability-braces-around-statements) <google-readability-braces-around-statements>
+    google-readability-casting
+    google-readability-function-size (redirects to readability-function-size) <google-readability-function-size>
+    google-readability-namespace-comments (redirects to llvm-namespace-comment) <google-readability-namespace-comments>
+    google-readability-todo
+    google-runtime-int
+    google-runtime-operator
+    google-runtime-references
+    hicpp-avoid-goto
+    hicpp-braces-around-statements (redirects to readability-braces-around-statements) <hicpp-braces-around-statements>
+    hicpp-deprecated-headers (redirects to modernize-deprecated-headers) <hicpp-deprecated-headers>
+    hicpp-exception-baseclass
+    hicpp-explicit-conversions (redirects to google-explicit-constructor) <hicpp-explicit-conversions>
+    hicpp-function-size (redirects to readability-function-size) <hicpp-function-size>
+    hicpp-invalid-access-moved (redirects to bugprone-use-after-move) <hicpp-invalid-access-moved>
+    hicpp-member-init (redirects to cppcoreguidelines-pro-type-member-init) <hicpp-member-init>
+    hicpp-move-const-arg (redirects to performance-move-const-arg) <hicpp-move-const-arg>
+    hicpp-multiway-paths-covered
+    hicpp-named-parameter (redirects to readability-named-parameter) <hicpp-named-parameter>
+    hicpp-new-delete-operators (redirects to misc-new-delete-overloads) <hicpp-new-delete-operators>
+    hicpp-no-array-decay (redirects to cppcoreguidelines-pro-bounds-array-to-pointer-decay) <hicpp-no-array-decay>
+    hicpp-no-assembler
+    hicpp-no-malloc (redirects to cppcoreguidelines-no-malloc) <hicpp-no-malloc>
+    hicpp-noexcept-move (redirects to misc-noexcept-moveconstructor) <hicpp-noexcept-move>
+    hicpp-signed-bitwise
+    hicpp-special-member-functions (redirects to cppcoreguidelines-special-member-functions) <hicpp-special-member-functions>
+    hicpp-static-assert (redirects to misc-static-assert) <hicpp-static-assert>
+    hicpp-undelegated-constructor (redirects to bugprone-undelegated-constructor) <hicpp-undelegated-constructor>
++   hicpp-uppercase-literal-suffix (redirects to readability-uppercase-literal-suffix) <hicpp-uppercase-literal-suffix>
+    hicpp-use-auto (redirects to modernize-use-auto) <hicpp-use-auto>
+    hicpp-use-emplace (redirects to modernize-use-emplace) <hicpp-use-emplace>
+    hicpp-use-equals-default (redirects to modernize-use-equals-default) <hicpp-use-equals-default>
+    hicpp-use-equals-delete (redirects to modernize-use-equals-delete) <hicpp-use-equals-delete>
+    hicpp-use-noexcept (redirects to modernize-use-noexcept) <hicpp-use-noexcept>
+    hicpp-use-nullptr (redirects to modernize-use-nullptr) <hicpp-use-nullptr>
+    hicpp-use-override (redirects to modernize-use-override) <hicpp-use-override>
+    hicpp-vararg (redirects to cppcoreguidelines-pro-type-vararg) <hicpp-vararg>
+-   hicpp-uppercase-literal-suffix (redirects to readability-uppercase-literal-suffix) <hicpp-uppercase-literal-suffix>
+    llvm-header-guard
+    llvm-include-order
+    llvm-namespace-comment
+    llvm-twine-local
+    misc-definitions-in-headers
+    misc-misplaced-const
+    misc-new-delete-overloads
+    misc-non-copyable-objects
+    misc-non-private-member-variables-in-classes
+    misc-redundant-expression
+    misc-static-assert
+    misc-throw-by-value-catch-by-reference
+    misc-unconventional-assign-operator
+    misc-uniqueptr-reset-release
+    misc-unused-alias-decls
+    misc-unused-parameters
+    misc-unused-using-decls
+    modernize-avoid-bind
+    modernize-concat-nested-namespaces
+    modernize-deprecated-headers
+    modernize-deprecated-ios-base-aliases
+    modernize-loop-convert
+    modernize-make-shared
+    modernize-make-unique
+    modernize-pass-by-value
+    modernize-raw-string-literal
+    modernize-redundant-void-arg
+    modernize-replace-auto-ptr
+    modernize-replace-random-shuffle
+    modernize-return-braced-init-list
+    modernize-shrink-to-fit
+    modernize-unary-static-assert
+    modernize-use-auto
+    modernize-use-bool-literals
+    modernize-use-default-member-init
+    modernize-use-emplace
+    modernize-use-equals-default
+    modernize-use-equals-delete
+    modernize-use-noexcept
+    modernize-use-nullptr
+    modernize-use-override
+    modernize-use-transparent-functors
+    modernize-use-uncaught-exceptions
+    modernize-use-using
+    mpi-buffer-deref
+    mpi-type-mismatch
+    objc-avoid-nserror-init
+    objc-avoid-spinlock
+    objc-forbidden-subclassing
+    objc-property-declaration
+    performance-faster-string-find
+    performance-for-range-copy
+    performance-implicit-conversion-in-loop
+    performance-inefficient-algorithm
+    performance-inefficient-string-concatenation
+    performance-inefficient-vector-operation
+    performance-move-const-arg
+    performance-move-constructor-init
+    performance-noexcept-move-constructor
+    performance-type-promotion-in-math-fn
+    performance-unnecessary-copy-initialization
+    performance-unnecessary-value-param
+    portability-simd-intrinsics
+    readability-avoid-const-params-in-decls
+    readability-braces-around-statements
+    readability-const-return-type
+    readability-container-size-empty
+    readability-delete-null-pointer
+    readability-deleted-default
+    readability-else-after-return
+    readability-function-size
+    readability-identifier-naming
+    readability-implicit-bool-conversion
+    readability-inconsistent-declaration-parameter-name
+    readability-isolate-declaration
+    readability-magic-numbers
+    readability-misleading-indentation
+    readability-misplaced-array-index
+    readability-named-parameter
+    readability-non-const-parameter
+    readability-redundant-control-flow
+    readability-redundant-declaration
+    readability-redundant-function-ptr-dereference
+    readability-redundant-member-init
+    readability-redundant-smartptr-get
+    readability-redundant-string-cstr
+    readability-redundant-string-init
+    readability-simplify-boolean-expr
+    readability-simplify-subscript-expr
+    readability-static-accessed-through-instance
+    readability-static-definition-in-anonymous-namespace
+    readability-string-compare
+    readability-uniqueptr-delete-release
+    readability-uppercase-literal-suffix
+    zircon-temporary-objects
+diff --git a/test/clang-tidy/abseil-make-unique.cpp b/test/clang-tidy/abseil-make-unique.cpp
+new file mode 100644
+index 00000000..6913f113
+--- /dev/null
++++ b/test/clang-tidy/abseil-make-unique.cpp
+@@ -0,0 +1,130 @@
++// RUN: %check_clang_tidy %s abseil-make-unique %t -- -- -std=c++11 \
++
++// CHECK-FIXES: #include <memory>
++
++namespace std {
++
++template <typename T>
++class default_delete {};
++
++template <typename type, typename Deleter = std::default_delete<type>>
++class unique_ptr {
++public:
++  unique_ptr() {}
++  unique_ptr(type *ptr) {}
++  unique_ptr(const unique_ptr<type> &t) = delete;
++  unique_ptr(unique_ptr<type> &&t) {}
++  ~unique_ptr() {}
++  type &operator*() { return *ptr; }
++  type *operator->() { return ptr; }
++  type *release() { return ptr; }
++  void reset() {}
++  void reset(type *pt) {}
++  void reset(type pt) {}
++  unique_ptr &operator=(unique_ptr &&) { return *this; }
++  template <typename T>
++  unique_ptr &operator=(unique_ptr<T> &&) { return *this; }
++
++private:
++  type *ptr;
++};
++
++}  // namespace std
++
++class A {
++ int x;
++ int y;
++
++ public:
++   A(int _x, int _y): x(_x), y(_y) {}
++};
++
++struct Base {
++  Base();
++};
++
++struct Derived : public Base {
++  Derived();
++};
++
++int* returnPointer();
++void expectPointer(std::unique_ptr<int> p);
++
++std::unique_ptr<int> makeAndReturnPointer() {
++  // Make smart pointer in return statement
++  return std::unique_ptr<int>(new int(0));
++  // CHECK-MESSAGES: :[[@LINE-1]]:10: warning: use absl::make_unique instead [abseil-make-unique]
++  // CHECK-FIXES: return absl::make_unique<int>(0);
++}
++
++void Positives() {
++  std::unique_ptr<int> P1 = std::unique_ptr<int>(new int(1));
++  // CHECK-MESSAGES: :[[@LINE-1]]:29: warning: use absl::make_unique instead [abseil-make-unique]
++  // CHECK-FIXES: std::unique_ptr<int> P1 = absl::make_unique<int>(1);
++
++  P1.reset(new int(2));
++  // CHECK-MESSAGES: :[[@LINE-1]]:6: warning: use absl::make_unique instead [abseil-make-unique]
++  // CHECK-FIXES: P1 = absl::make_unique<int>(2);
++
++  // Non-primitive paramter
++  std::unique_ptr<A> P2 = std::unique_ptr<A>(new A(1, 2));
++  // CHECK-MESSAGES: :[[@LINE-1]]:27: warning: use absl::make_unique instead [abseil-make-unique]
++  // CHECK-FIXES: std::unique_ptr<A> P2 = absl::make_unique<A>(1, 2);
++
++  P2.reset(new A(3, 4));
++  // CHECK-MESSAGES: :[[@LINE-1]]:6: warning: use absl::make_unique instead [abseil-make-unique]
++  // CHECK-FIXES: P2 = absl::make_unique<A>(3, 4);
++
++  // No arguments to new expression
++  std::unique_ptr<int> P3 = std::unique_ptr<int>(new int);
++  // CHECK-MESSAGES: :[[@LINE-1]]:29: warning: use absl::make_unique instead [abseil-make-unique]
++  // CHECK-FIXES: std::unique_ptr<int> P3 = absl::make_unique<int>();
++
++  P3.reset(new int);
++  // CHECK-MESSAGES: :[[@LINE-1]]:6: warning: use absl::make_unique instead [abseil-make-unique]
++  // CHECK-FIXES: P3 = absl::make_unique<int>();
++
++  // Nested parentheses
++  std::unique_ptr<int> P4 = std::unique_ptr<int>((new int(3)));
++  // CHECK-MESSAGES: :[[@LINE-1]]:29: warning: use absl::make_unique instead [abseil-make-unique]
++  // CHECK-FIXES: std::unique_ptr<int> P4 = absl::make_unique<int>(3);
++
++  P4 = std::unique_ptr<int>(((new int(4))));
++  // CHECK-MESSAGES: :[[@LINE-1]]:8: warning: use absl::make_unique instead [abseil-make-unique]
++  // CHECK-FIXES: P4 = absl::make_unique<int>(4);
++
++  P4.reset((new int(5)));
++  // CHECK-MESSAGES: :[[@LINE-1]]:6: warning: use absl::make_unique instead [abseil-make-unique]
++  // CHECK-FIXES: P4 = absl::make_unique<int>(5);
++
++  // With auto
++  auto P5 = std::unique_ptr<int>(new int());
++  // CHECK-MESSAGES: :[[@LINE-1]]:13: warning: use absl::make_unique instead [abseil-make-unique]
++  // CHECK-FIXES: auto P5 = absl::make_unique<int>();
++
++  {
++    // No std
++    using namespace std;
++    unique_ptr<int> Q = unique_ptr<int>(new int());
++    // CHECK-MESSAGES: :[[@LINE-1]]:25: warning: use absl::make_unique instead [abseil-make-unique]
++    // CHECK-FIXES: unique_ptr<int> Q = absl::make_unique<int>();
++
++    Q = unique_ptr<int>(new int());
++    // CHECK-MESSAGES: :[[@LINE-1]]:9: warning: use absl::make_unique instead [abseil-make-unique]
++    // CHECK-FIXES: Q = absl::make_unique<int>();
++  }
++
++  // Create the unique_ptr as a parameter to a function
++  expectPointer(std::unique_ptr<int>(new int()));
++  // CHECK-MESSAGES: :[[@LINE-1]]:17: warning: use absl::make_unique instead [abseil-make-unique]
++  // CHECK-FIXES: expectPointer(absl::make_unique<int>());
++}
++
++void Negatives() {
++  // Only warn if explicitly allocating a new object
++  std::unique_ptr<int> R = std::unique_ptr<int>(returnPointer());
++  R.reset(returnPointer());
++
++  // Only replace if the template type is same as new type
++  auto Pderived = std::unique_ptr<Base>(new Derived());
++}

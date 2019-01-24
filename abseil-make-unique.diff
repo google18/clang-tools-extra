@@ -1,0 +1,422 @@
+diff --git a/clang-tidy/abseil/AbseilTidyModule.cpp b/clang-tidy/abseil/AbseilTidyModule.cpp
+index e02b1e0e..92d3d496 100644
+--- a/clang-tidy/abseil/AbseilTidyModule.cpp
++++ b/clang-tidy/abseil/AbseilTidyModule.cpp
+@@ -13,6 +13,7 @@
+ #include "DurationDivisionCheck.h"
+ #include "DurationFactoryFloatCheck.h"
+ #include "FasterStrsplitDelimiterCheck.h"
++#include "MakeUniqueCheck.h"
+ #include "NoInternalDependenciesCheck.h"
+ #include "NoNamespaceCheck.h"
+ #include "RedundantStrcatCallsCheck.h"
+@@ -32,6 +33,8 @@ public:
+         "abseil-duration-factory-float");
+     CheckFactories.registerCheck<FasterStrsplitDelimiterCheck>(
+         "abseil-faster-strsplit-delimiter");
++    CheckFactories.registerCheck<MakeUniqueCheck>(
++        "abseil-make-unique");
+     CheckFactories.registerCheck<NoInternalDependenciesCheck>(
+         "abseil-no-internal-dependencies");
+     CheckFactories.registerCheck<NoNamespaceCheck>("abseil-no-namespace");
+diff --git a/clang-tidy/abseil/CMakeLists.txt b/clang-tidy/abseil/CMakeLists.txt
+index 48389d7f..8e973bd1 100644
+--- a/clang-tidy/abseil/CMakeLists.txt
++++ b/clang-tidy/abseil/CMakeLists.txt
+@@ -5,6 +5,7 @@ add_clang_library(clangTidyAbseilModule
+   DurationDivisionCheck.cpp
+   DurationFactoryFloatCheck.cpp
+   FasterStrsplitDelimiterCheck.cpp
++  MakeUniqueCheck.cpp
+   NoInternalDependenciesCheck.cpp
+   NoNamespaceCheck.cpp
+   RedundantStrcatCallsCheck.cpp
+diff --git a/clang-tidy/abseil/MakeUniqueCheck.cpp b/clang-tidy/abseil/MakeUniqueCheck.cpp
+new file mode 100644
+index 00000000..44800690
+--- /dev/null
++++ b/clang-tidy/abseil/MakeUniqueCheck.cpp
+@@ -0,0 +1,141 @@
++//===--- MakeUniqueCheck.cpp - clang-tidy ---------------------------------===//
++//
++//                     The LLVM Compiler Infrastructure
++//
++// This file is distributed under the University of Illinois Open Source
++// License. See LICENSE.TXT for details.
++//
++//===----------------------------------------------------------------------===//
++
++#include <string>
++#include "MakeUniqueCheck.h"
++#include "clang/AST/ASTContext.h"
++#include "clang/ASTMatchers/ASTMatchFinder.h"
++
++using namespace clang::ast_matchers;
++
++namespace clang {
++namespace tidy {
++namespace abseil {
++
++std::string MakeUniqueCheck::getArgs(const SourceManager *SM,
++                                     const CXXNewExpr *NewExpr) {
++  if (NewExpr->getInitializationStyle() ==
++    CXXNewExpr::InitializationStyle::ListInit) {
++    SourceRange InitRange = NewExpr->getInitializer()->getSourceRange();
++    llvm::StringRef ArgRef = Lexer::getSourceText(CharSourceRange::getCharRange(
++      InitRange.getBegin().getLocWithOffset(1), InitRange.getEnd()),
++      *SM, LangOptions());
++    return "(" + ArgRef.str() + ")";
++  }
++  llvm::StringRef ArgRef = Lexer::getSourceText(CharSourceRange::getCharRange(
++    NewExpr->getDirectInitRange()),
++    *SM, LangOptions());
++  return (ArgRef.str().length() > 0) ? ArgRef.str() + ")" : "()";
++}
++
++std::string MakeUniqueCheck::getType(const SourceManager *SM,
++                                     const CXXNewExpr *NewExpr,
++                                     const Expr *Outer) {
++  SourceRange TypeRange(
++    NewExpr->getAllocatedTypeSourceInfo()->getTypeLoc().getBeginLoc(),
++    NewExpr->getDirectInitRange().getBegin()
++  );
++  if (!TypeRange.isValid()) {
++    TypeRange.setEnd(Outer->getEndLoc());
++  }
++  llvm::StringRef TypeRef = Lexer::getSourceText(
++    CharSourceRange::getCharRange(TypeRange), *SM, LangOptions()
++  );
++  return TypeRef.str();
++}
++
++void MakeUniqueCheck::registerMatchers(MatchFinder *Finder) {
++  Finder->addMatcher(cxxConstructExpr(
++    hasType(cxxRecordDecl(hasName("std::unique_ptr"))),
++    argumentCountIs(1),
++    hasArgument(0, cxxNewExpr().bind("cons_new")),
++    anyOf(hasParent(decl().bind("cons_decl")), anything())).bind("cons"),
++    this);
++
++  Finder->addMatcher(cxxMemberCallExpr(
++    callee(cxxMethodDecl(
++             hasName("reset"),
++             ofClass(cxxRecordDecl(hasName("std::unique_ptr"))))),
++    argumentCountIs(1),
++    hasArgument(0, cxxNewExpr().bind("reset_new"))).bind("reset_call"),
++    this);
++}
++
++void MakeUniqueCheck::check(const MatchFinder::MatchResult &Result) {
++  const SourceManager *SM = Result.SourceManager;
++  const auto *Cons = Result.Nodes.getNodeAs<CXXConstructExpr>("cons");
++  const auto *ConsNew = Result.Nodes.getNodeAs<CXXNewExpr>("cons_new");
++  const auto *ConsDecl = Result.Nodes.getNodeAs<Decl>("cons_decl");
++
++  if (Cons) {
++    // Get name of declared variable, if exists
++    llvm::StringRef NameRef = Lexer::getSourceText(
++      CharSourceRange::getCharRange(Cons->getBeginLoc(),
++      Cons->getParenOrBraceRange().getBegin()),
++      *SM, LangOptions());
++    std::string Left = (ConsDecl) ? "auto " + NameRef.str() + " = " : "";
++
++    std::string NewText;
++    std::string DiagText;
++
++    // Use WrapUnique for list initialization
++    if (ConsNew->getInitializationStyle() ==
++      CXXNewExpr::InitializationStyle::ListInit) {
++      NewText = Left + "absl::WrapUnique" + getArgs(SM, ConsNew);
++      DiagText = "prefer absl::WrapUnique to constructing unique_ptr with new";
++    } else {
++      NewText = Left + "absl::make_unique<" + getType(SM, ConsNew, Cons) + ">" +
++                getArgs(SM, ConsNew);
++      DiagText = "prefer absl::make_unique to constructing unique_ptr with new";
++    }
++
++    // If there is an associated Decl, start diagnostic there, otherwise use the
++    // beginning of the Expr
++    SourceLocation Target = (ConsDecl) ? ConsDecl->getBeginLoc()
++      : Cons->getExprLoc();
++    diag(Target, DiagText) << FixItHint::CreateReplacement(
++      CharSourceRange::getTokenRange(Target, Cons->getEndLoc()), NewText);
++  }
++
++  const auto *Reset = Result.Nodes.getNodeAs<CXXMemberCallExpr>("reset_call");
++  const auto *ResetNew = Result.Nodes.getNodeAs<CXXNewExpr>("reset_new");
++  if (Reset) {
++    // Get name of caller object
++    const Expr *ObjectArg = Reset->getImplicitObjectArgument();
++    llvm::StringRef ObjName = Lexer::getSourceText(
++      CharSourceRange::getCharRange(ObjectArg->getBeginLoc(),
++        Reset->getExprLoc().getLocWithOffset(-1)),
++      *SM, LangOptions()
++    );
++
++    std::string NewText = ObjName.str() + " = absl::make_unique<" +
++      getType(SM, ResetNew, Reset) + ">" + getArgs(SM, ResetNew);
++    std::string DiagText = "prefer absl::make_unique to resetting unique_ptr \
++      with new";
++
++    // Use WrapUnique for list initialization
++    if (ResetNew->getInitializationStyle() ==
++      CXXNewExpr::InitializationStyle::ListInit) {
++      NewText = ObjName.str() + " = absl::WrapUnique" + getArgs(SM, ResetNew);
++      DiagText = "prefer absl::WrapUnique to resetting unique_ptr with new";
++    } else {
++      NewText = ObjName.str() + " = absl::make_unique<" +
++                getType(SM, ResetNew, Reset) + ">" + getArgs(SM, ResetNew);
++      DiagText = "prefer absl::make_unique to resetting unique_ptr with new";
++    }
++
++    diag(ObjectArg->getExprLoc(), DiagText) << FixItHint::CreateReplacement(
++      CharSourceRange::getTokenRange(ObjectArg->getExprLoc(),
++        Reset->getEndLoc()), NewText);
++  }
++}
++
++} // namespace abseil
++} // namespace tidy
++} // namespace clang
+diff --git a/clang-tidy/abseil/MakeUniqueCheck.h b/clang-tidy/abseil/MakeUniqueCheck.h
+new file mode 100644
+index 00000000..b54ddc17
+--- /dev/null
++++ b/clang-tidy/abseil/MakeUniqueCheck.h
+@@ -0,0 +1,40 @@
++//===--- MakeUniqueCheck.h - clang-tidy -------------------------*- C++ -*-===//
++//
++//                     The LLVM Compiler Infrastructure
++//
++// This file is distributed under the University of Illinois Open Source
++// License. See LICENSE.TXT for details.
++//
++//===----------------------------------------------------------------------===//
++
++#ifndef LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_ABSEIL_MAKEUNIQUECHECK_H
++#define LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_ABSEIL_MAKEUNIQUECHECK_H
++
++#include "../ClangTidy.h"
++
++namespace clang {
++namespace tidy {
++namespace abseil {
++
++/// Checks for unclear pointer ownership through constructing std::unique_ptr with
++/// a call to new, and recommends using absl::make_unique or absl::WrapUnique
++/// instead. Note that these are similar to the std::make_unique functions, but
++/// differ in how they handle factory constructors and brace initialization,
++/// choosing to defer to absl::WrapUnique.
++class MakeUniqueCheck : public ClangTidyCheck {
++private:
++  std::string getArgs(const SourceManager *SM, const CXXNewExpr *NewExpr);
++  std::string getType(const SourceManager *SM, const CXXNewExpr *NewExpr, const Expr *Outer);
++
++public:
++  MakeUniqueCheck(StringRef Name, ClangTidyContext *Context)
++      : ClangTidyCheck(Name, Context) {}
++  void registerMatchers(ast_matchers::MatchFinder *Finder) override;
++  void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
++};
++
++} // namespace abseil
++} // namespace tidy
++} // namespace clang
++
++#endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_ABSEIL_MAKEUNIQUECHECK_H
+diff --git a/docs/ReleaseNotes.rst b/docs/ReleaseNotes.rst
+index 45dffb92..142858fb 100644
+--- a/docs/ReleaseNotes.rst
++++ b/docs/ReleaseNotes.rst
+@@ -67,6 +67,13 @@ The improvements are...
+ Improvements to clang-tidy
+ --------------------------
+ 
++- New :doc:`abseil-make-unique
++  <clang-tidy/checks/abseil-make-unique>` check.
++
++  Checks for cases where ``std::unique_ptr`` is constructed with a call
++  to new, and recommends that ``absl::make_unique`` or ``absl::WrapUnique``
++  are used instead.
++
+ - New :doc:`abseil-duration-division
+   <clang-tidy/checks/abseil-duration-division>` check.
+ 
+diff --git a/docs/clang-tidy/checks/abseil-make-unique.rst b/docs/clang-tidy/checks/abseil-make-unique.rst
+new file mode 100644
+index 00000000..cfebb63b
+--- /dev/null
++++ b/docs/clang-tidy/checks/abseil-make-unique.rst
+@@ -0,0 +1,16 @@
++.. title:: clang-tidy - abseil-make-unique
++
++abseil-make-unique
++==================
++
++Replaces unique pointers that are constructed with raw pointers with ``absl::make_unique``, for leak-free dynamic allocation.
++
++.. code-block:: c++
++  std::unique_ptr<int> upi(new int);
++
++will be replaced with
++
++.. code-block:: c++
++  auto upi = absl::make_unique<int>();
++
++See https://abseil.io/tips/126 for full explanation and justification.
+diff --git a/docs/clang-tidy/checks/list.rst b/docs/clang-tidy/checks/list.rst
+index f33130b5..98ae6367 100644
+--- a/docs/clang-tidy/checks/list.rst
++++ b/docs/clang-tidy/checks/list.rst
+@@ -7,11 +7,12 @@ Clang-Tidy Checks
+    abseil-duration-division
+    abseil-duration-factory-float
+    abseil-faster-strsplit-delimiter
++   abseil-make-unique
+    abseil-no-internal-dependencies
+    abseil-no-namespace
+    abseil-redundant-strcat-calls
+-   abseil-string-find-startswith
+    abseil-str-cat-append
++   abseil-string-find-startswith
+    android-cloexec-accept
+    android-cloexec-accept4
+    android-cloexec-creat
+@@ -151,6 +152,7 @@ Clang-Tidy Checks
+    hicpp-special-member-functions (redirects to cppcoreguidelines-special-member-functions) <hicpp-special-member-functions>
+    hicpp-static-assert (redirects to misc-static-assert) <hicpp-static-assert>
+    hicpp-undelegated-constructor (redirects to bugprone-undelegated-constructor) <hicpp-undelegated-constructor>
++   hicpp-uppercase-literal-suffix (redirects to readability-uppercase-literal-suffix) <hicpp-uppercase-literal-suffix>
+    hicpp-use-auto (redirects to modernize-use-auto) <hicpp-use-auto>
+    hicpp-use-emplace (redirects to modernize-use-emplace) <hicpp-use-emplace>
+    hicpp-use-equals-default (redirects to modernize-use-equals-default) <hicpp-use-equals-default>
+@@ -159,7 +161,6 @@ Clang-Tidy Checks
+    hicpp-use-nullptr (redirects to modernize-use-nullptr) <hicpp-use-nullptr>
+    hicpp-use-override (redirects to modernize-use-override) <hicpp-use-override>
+    hicpp-vararg (redirects to cppcoreguidelines-pro-type-vararg) <hicpp-vararg>
+-   hicpp-uppercase-literal-suffix (redirects to readability-uppercase-literal-suffix) <hicpp-uppercase-literal-suffix>
+    llvm-header-guard
+    llvm-include-order
+    llvm-namespace-comment
+diff --git a/test/clang-tidy/abseil-make-unique.cpp b/test/clang-tidy/abseil-make-unique.cpp
+new file mode 100644
+index 00000000..5fc7e6ed
+--- /dev/null
++++ b/test/clang-tidy/abseil-make-unique.cpp
+@@ -0,0 +1,116 @@
++// RUN: %check_clang_tidy %s abseil-make-unique %t
++namespace std {
++template <typename T>
++struct default_delete {};
++
++template <typename T, typename D = default_delete<T>>
++class unique_ptr {
++ public:
++  unique_ptr();
++  explicit unique_ptr(T*);
++  void reset(T*);
++};
++}  // namespace std
++
++class A {
++ int x;
++ int y;
++
++ public:
++   A(int _x, int _y): x(_x), y(_y) {}
++};
++
++struct B {
++  int x;
++  int y;
++};
++
++int* ReturnPointer();
++void ExpectPointer(std::unique_ptr<int> p);
++
++std::unique_ptr<int> MakeAndReturnPointer() {
++  // Make smart pointer in return statement
++  return std::unique_ptr<int>(new int(0));
++  // CHECK-MESSAGES: :[[@LINE-1]]:10: warning: prefer absl::make_unique to constructing unique_ptr with new [abseil-make-unique]
++  // CHECK-FIXES: return absl::make_unique<int>(0);
++}
++
++void Positives() {
++  std::unique_ptr<int> a(new int(1));
++  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to constructing unique_ptr with new [abseil-make-unique]
++  // CHECK-FIXES: auto a = absl::make_unique<int>(1);
++
++  std::unique_ptr<int> b;
++  b.reset(new int(2));
++  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to resetting unique_ptr with new [abseil-make-unique]
++  // CHECK-FIXES: b = absl::make_unique<int>(2);
++
++  // Non-primitive paramter
++  std::unique_ptr<A> c(new A(1, 2));
++  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to constructing unique_ptr with new [abseil-make-unique]
++  // CHECK-FIXES: auto c = absl::make_unique<A>(1, 2);
++
++  std::unique_ptr<A> d;
++  d.reset(new A(3, 4));
++  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to resetting unique_ptr with new [abseil-make-unique]
++  // CHECK-FIXES: d = absl::make_unique<A>(3, 4);
++
++  // No arguments to new expression
++  std::unique_ptr<int> e(new int);
++  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to constructing unique_ptr with new [abseil-make-unique]
++  // CHECK-FIXES: auto e = absl::make_unique<int>();
++
++  std::unique_ptr<int> f;
++  f.reset(new int);
++  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to resetting unique_ptr with new [abseil-make-unique]
++  // CHECK-FIXES: f = absl::make_unique<int>();
++
++  // Nested parentheses
++  std::unique_ptr<int> g((new int(3)));
++  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to constructing unique_ptr with new [abseil-make-unique]
++  // CHECK-FIXES: auto g = absl::make_unique<int>(3);
++
++  std::unique_ptr<int> h(((new int(4))));
++  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to constructing unique_ptr with new [abseil-make-unique]
++  // CHECK-FIXES: auto h = absl::make_unique<int>(4);
++
++  std::unique_ptr<int> i;
++  i.reset((new int(5)));
++  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to resetting unique_ptr with new [abseil-make-unique]
++  // CHECK-FIXES: i = absl::make_unique<int>(5);
++
++  std::unique_ptr<int> j;
++  j.reset(((new int(6))));
++  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to resetting unique_ptr with new [abseil-make-unique]
++  // CHECK-FIXES: j = absl::make_unique<int>(6);
++
++  // Construct unique_ptr within a function
++  ExpectPointer(std::unique_ptr<int>(new int(5)));
++  // CHECK-MESSAGES: :[[@LINE-1]]:17: warning: prefer absl::make_unique to constructing unique_ptr with new [abseil-make-unique]
++  // CHECK-FIXES: ExpectPointer(absl::make_unique<int>(5));
++
++  // Brace initialization
++  std::unique_ptr<B> k(new B{1, 2});
++  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::WrapUnique to constructing unique_ptr with new [abseil-make-unique]
++  // CHECK-FIXES: auto k = absl::WrapUnique(1, 2);
++
++  std::unique_ptr<B> l;
++  l.reset(new B{3, 4});
++  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::WrapUnique to resetting unique_ptr with new [abseil-make-unique]
++  // CHECK-FIXES: l = absl::WrapUnique(3, 4);
++}
++
++// Checks within namespaces
++namespace std {
++  unique_ptr<int> k(new int(7));
++  // CHECK-MESSAGES: :[[@LINE-1]]:3: warning: prefer absl::make_unique to constructing unique_ptr with new [abseil-make-unique]
++  // CHECK-FIXES: auto k = absl::make_unique<int>(7);
++}
++
++void Negatives() {
++  // Do not warn for functions that return a pointer
++  std::unique_ptr<int> a(ReturnPointer());
++
++  std::unique_ptr<int> b;
++  b.reset(ReturnPointer());
++}
