@@ -1,9 +1,8 @@
 //===-- ChangeNamespace.cpp - Change namespace implementation -------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 #include "ChangeNamespace.h"
@@ -450,8 +449,8 @@ void ChangeNamespaceTool::registerMatchers(ast_matchers::MatchFinder *Finder) {
       typeLoc(IsInMovedNs,
               loc(qualType(hasDeclaration(DeclMatcher.bind("from_decl")))),
               unless(anyOf(hasParent(typeLoc(loc(qualType(
-                               allOf(hasDeclaration(DeclMatcher),
-                                     unless(templateSpecializationType())))))),
+                               hasDeclaration(DeclMatcher),
+                               unless(templateSpecializationType()))))),
                            hasParent(nestedNameSpecifierLoc()),
                            hasAncestor(isImplicit()),
                            hasAncestor(UsingShadowDeclInClass),
@@ -505,13 +504,12 @@ void ChangeNamespaceTool::registerMatchers(ast_matchers::MatchFinder *Finder) {
                                 hasAncestor(namespaceDecl(isAnonymous())),
                                 hasAncestor(cxxRecordDecl()))),
                    hasParent(namespaceDecl()));
-  Finder->addMatcher(
-      expr(allOf(hasAncestor(decl().bind("dc")), IsInMovedNs,
-                 unless(hasAncestor(isImplicit())),
-                 anyOf(callExpr(callee(FuncMatcher)).bind("call"),
-                       declRefExpr(to(FuncMatcher.bind("func_decl")))
-                           .bind("func_ref")))),
-      this);
+  Finder->addMatcher(expr(hasAncestor(decl().bind("dc")), IsInMovedNs,
+                          unless(hasAncestor(isImplicit())),
+                          anyOf(callExpr(callee(FuncMatcher)).bind("call"),
+                                declRefExpr(to(FuncMatcher.bind("func_decl")))
+                                    .bind("func_ref"))),
+                     this);
 
   auto GlobalVarMatcher = varDecl(
       hasGlobalStorage(), hasParent(namespaceDecl()),

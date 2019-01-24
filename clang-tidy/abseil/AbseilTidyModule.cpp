@@ -1,17 +1,20 @@
 //===------- AbseilTidyModule.cpp - clang-tidy ----------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
 #include "../ClangTidy.h"
 #include "../ClangTidyModule.h"
 #include "../ClangTidyModuleRegistry.h"
+#include "DurationComparisonCheck.h"
+#include "DurationConversionCastCheck.h"
 #include "DurationDivisionCheck.h"
 #include "DurationFactoryFloatCheck.h"
+#include "DurationFactoryScaleCheck.h"
+#include "DurationSubtractionCheck.h"
 #include "FasterStrsplitDelimiterCheck.h"
 #include "MakeUniqueCheck.h"
 #include "NoInternalDependenciesCheck.h"
@@ -19,6 +22,7 @@
 #include "RedundantStrcatCallsCheck.h"
 #include "StringFindStartswithCheck.h"
 #include "StrCatAppendCheck.h"
+#include "UpgradeDurationConversionsCheck.h"
 
 namespace clang {
 namespace tidy {
@@ -27,10 +31,18 @@ namespace abseil {
 class AbseilModule : public ClangTidyModule {
 public:
   void addCheckFactories(ClangTidyCheckFactories &CheckFactories) override {
+    CheckFactories.registerCheck<DurationComparisonCheck>(
+        "abseil-duration-comparison");
+    CheckFactories.registerCheck<DurationConversionCastCheck>(
+        "abseil-duration-conversion-cast");
     CheckFactories.registerCheck<DurationDivisionCheck>(
         "abseil-duration-division");
     CheckFactories.registerCheck<DurationFactoryFloatCheck>(
         "abseil-duration-factory-float");
+    CheckFactories.registerCheck<DurationFactoryScaleCheck>(
+        "abseil-duration-factory-scale");
+    CheckFactories.registerCheck<DurationSubtractionCheck>(
+        "abseil-duration-subtraction");
     CheckFactories.registerCheck<FasterStrsplitDelimiterCheck>(
         "abseil-faster-strsplit-delimiter");
     CheckFactories.registerCheck<MakeUniqueCheck>(
@@ -44,6 +56,8 @@ public:
         "abseil-str-cat-append");
     CheckFactories.registerCheck<StringFindStartswithCheck>(
         "abseil-string-find-startswith");
+    CheckFactories.registerCheck<UpgradeDurationConversionsCheck>(
+        "abseil-upgrade-duration-conversions");
   }
 };
 

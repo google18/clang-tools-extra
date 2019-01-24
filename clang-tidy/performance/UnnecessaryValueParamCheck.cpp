@@ -1,9 +1,8 @@
 //===--- UnnecessaryValueParamCheck.cpp - clang-tidy-----------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -79,11 +78,11 @@ void UnnecessaryValueParamCheck::registerMatchers(MatchFinder *Finder) {
   if (!getLangOpts().CPlusPlus)
     return;
   const auto ExpensiveValueParamDecl = parmVarDecl(
-      hasType(qualType(allOf(
+      hasType(qualType(
           hasCanonicalType(matchers::isExpensiveToCopy()),
           unless(anyOf(hasCanonicalType(referenceType()),
                        hasDeclaration(namedDecl(
-                           matchers::matchesAnyListedName(AllowedTypes)))))))),
+                           matchers::matchesAnyListedName(AllowedTypes))))))),
       decl().bind("param"));
   Finder->addMatcher(
       functionDecl(hasBody(stmt()), isDefinition(), unless(isImplicit()),
