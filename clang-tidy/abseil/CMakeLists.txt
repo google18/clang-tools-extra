@@ -9,6 +9,7 @@ add_clang_library(clangTidyAbseilModule
   RedundantStrcatCallsCheck.cpp
   StrCatAppendCheck.cpp
   StringFindStartswithCheck.cpp
+  WrapUniqueCheck.cpp
 
   LINK_LIBS
   clangAST

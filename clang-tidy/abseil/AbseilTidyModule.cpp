@@ -17,6 +17,7 @@
 #include "RedundantStrcatCallsCheck.h"
 #include "StringFindStartswithCheck.h"
 #include "StrCatAppendCheck.h"
+#include "WrapUniqueCheck.h"
 
 namespace clang {
 namespace tidy {
@@ -38,6 +39,8 @@ public:
         "abseil-str-cat-append");
     CheckFactories.registerCheck<StringFindStartswithCheck>(
         "abseil-string-find-startswith");
+    CheckFactories.registerCheck<WrapUniqueCheck>(
+        "abseil-wrap-unique");
   }
 };
 

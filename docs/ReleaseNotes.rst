@@ -67,6 +67,13 @@ The improvements are...
 Improvements to clang-tidy
 --------------------------
 
+- New :doc:`abseil-wrap-unique
+  <clang-tidy/checks/abseil-wrap-unique>` check.
+
+  Looks for instances of factory functions which uses a non-public constructor
+  that returns a std::unqiue_ptr<T> type then recommends using 
+  absl::wrap_unique(new T(...)).
+
 - New :doc:`abseil-duration-division
   <clang-tidy/checks/abseil-duration-division>` check.
 
