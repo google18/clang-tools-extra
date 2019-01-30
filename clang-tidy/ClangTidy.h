@@ -1,9 +1,8 @@
 //===--- ClangTidy.h - clang-tidy -------------------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -230,12 +229,13 @@ getCheckOptions(const ClangTidyOptions &Options,
 /// \param StoreCheckProfile If provided, and EnableCheckProfile is true,
 /// the profile will not be output to stderr, but will instead be stored
 /// as a JSON file in the specified directory.
-void runClangTidy(clang::tidy::ClangTidyContext &Context,
-                  const tooling::CompilationDatabase &Compilations,
-                  ArrayRef<std::string> InputFiles,
-                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS,
-                  bool EnableCheckProfile = false,
-                  llvm::StringRef StoreCheckProfile = StringRef());
+std::vector<ClangTidyError>
+runClangTidy(clang::tidy::ClangTidyContext &Context,
+             const tooling::CompilationDatabase &Compilations,
+             ArrayRef<std::string> InputFiles,
+             llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS,
+             bool EnableCheckProfile = false,
+             llvm::StringRef StoreCheckProfile = StringRef());
 
 // FIXME: This interface will need to be significantly extended to be useful.
 // FIXME: Implement confidence levels for displaying/fixing errors.
@@ -243,7 +243,8 @@ void runClangTidy(clang::tidy::ClangTidyContext &Context,
 /// \brief Displays the found \p Errors to the users. If \p Fix is true, \p
 /// Errors containing fixes are automatically applied and reformatted. If no
 /// clang-format configuration file is found, the given \P FormatStyle is used.
-void handleErrors(ClangTidyContext &Context, bool Fix,
+void handleErrors(llvm::ArrayRef<ClangTidyError> Errors,
+                  ClangTidyContext &Context, bool Fix,
                   unsigned &WarningsAsErrorsCount,
                   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS);
 

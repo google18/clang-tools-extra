@@ -1,9 +1,8 @@
 //===-- ChangeNamespaceTests.cpp - Change namespace unit tests ---*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -2241,6 +2240,39 @@ TEST_F(ChangeNamespaceTest, InjectedClassNameInFriendDecl) {
                          "  b.f();\n"
                          "}\n"
                          "}  // namespace e\n";
+  EXPECT_EQ(format(Expected), runChangeNamespaceOnCode(Code));
+}
+
+TEST_F(ChangeNamespaceTest, FullyQualifyConflictNamespace) {
+  std::string Code =
+      "namespace x { namespace util { class Some {}; } }\n"
+      "namespace x { namespace y {namespace base { class Base {}; } } }\n"
+      "namespace util { class Status {}; }\n"
+      "namespace base { class Base {}; }\n"
+      "namespace na {\n"
+      "namespace nb {\n"
+      "void f() {\n"
+      "  util::Status s1; x::util::Some s2;\n"
+      "  base::Base b1; x::y::base::Base b2;\n"
+      "}\n"
+      "} // namespace nb\n"
+      "} // namespace na\n";
+
+  std::string Expected =
+      "namespace x { namespace util { class Some {}; } }\n"
+      "namespace x { namespace y {namespace base { class Base {}; } } }\n"
+      "namespace util { class Status {}; }\n"
+      "namespace base { class Base {}; }\n"
+      "\n"
+      "namespace x {\n"
+      "namespace y {\n"
+      "void f() {\n"
+      "  ::util::Status s1; util::Some s2;\n"
+      "  ::base::Base b1; base::Base b2;\n"
+      "}\n"
+      "} // namespace y\n"
+      "} // namespace x\n";
+
   EXPECT_EQ(format(Expected), runChangeNamespaceOnCode(Code));
 }
 

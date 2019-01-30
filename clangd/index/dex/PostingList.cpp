@@ -1,9 +1,8 @@
 //===--- PostingList.cpp - Symbol identifiers storage interface -----------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -16,7 +15,6 @@
 namespace clang {
 namespace clangd {
 namespace dex {
-
 namespace {
 
 /// Implements iterator of PostingList chunks. This requires iterating over two
@@ -187,7 +185,7 @@ std::vector<Chunk> encodeStream(llvm::ArrayRef<DocID> Documents) {
 /// the stream is terminated, return None.
 llvm::Optional<DocID> readVByte(llvm::ArrayRef<uint8_t> &Bytes) {
   if (Bytes.front() == 0 || Bytes.empty())
-    return llvm::None;
+    return None;
   DocID Result = 0;
   bool HasNextByte = true;
   for (size_t Length = 0; HasNextByte && !Bytes.empty(); ++Length) {

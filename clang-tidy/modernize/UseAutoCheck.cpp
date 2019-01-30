@@ -1,9 +1,8 @@
 //===--- UseAutoCheck.cpp - clang-tidy-------------------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -211,7 +210,7 @@ AST_POLYMORPHIC_MATCHER(hasExplicitTemplateArgs,
 /// \brief Returns a DeclarationMatcher that matches standard iterators nested
 /// inside records with a standard container name.
 DeclarationMatcher standardIterator() {
-  return allOf(
+  return decl(
       namedDecl(hasStdIteratorName()),
       hasDeclContext(recordDecl(hasStdContainerName(), isFromStdNamespace())));
 }
@@ -233,7 +232,7 @@ TypeMatcher nestedIterator() {
 TypeMatcher iteratorFromUsingDeclaration() {
   auto HasIteratorDecl = hasDeclaration(namedDecl(hasStdIteratorName()));
   // Types resulting from using declarations are represented by elaboratedType.
-  return elaboratedType(allOf(
+  return elaboratedType(
       // Unwrap the nested name specifier to test for one of the standard
       // containers.
       hasQualifier(specifiesType(templateSpecializationType(hasDeclaration(
@@ -241,7 +240,7 @@ TypeMatcher iteratorFromUsingDeclaration() {
       // the named type is what comes after the final '::' in the type. It
       // should name one of the standard iterator names.
       namesType(
-          anyOf(typedefType(HasIteratorDecl), recordType(HasIteratorDecl)))));
+          anyOf(typedefType(HasIteratorDecl), recordType(HasIteratorDecl))));
 }
 
 /// \brief This matcher returns declaration statements that contain variable

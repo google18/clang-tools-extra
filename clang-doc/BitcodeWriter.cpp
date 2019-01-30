@@ -1,9 +1,8 @@
 //===--  BitcodeWriter.cpp - ClangDoc Bitcode Writer ------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -309,10 +308,8 @@ void ClangDocBitcodeWriter::emitRecord(const Location &Loc, RecordId ID) {
   // FIXME: Assert that the line number is of the appropriate size.
   Record.push_back(Loc.LineNumber);
   assert(Loc.Filename.size() < (1U << BitCodeConstants::StringLengthSize));
-  // Record.push_back(Loc.Filename.size());
-  // Stream.EmitRecordWithBlob(Abbrevs.get(ID), Record, Loc.Filename);
-  Record.push_back(4);
-  Stream.EmitRecordWithBlob(Abbrevs.get(ID), Record, "test");
+  Record.push_back(Loc.Filename.size());
+  Stream.EmitRecordWithBlob(Abbrevs.get(ID), Record, Loc.Filename);
 }
 
 void ClangDocBitcodeWriter::emitRecord(bool Val, RecordId ID) {

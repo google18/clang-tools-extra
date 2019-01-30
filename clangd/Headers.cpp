@@ -1,9 +1,8 @@
 //===--- Headers.cpp - Include headers ---------------------------*- C++-*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -34,13 +33,17 @@ public:
                           llvm::StringRef /*SearchPath*/,
                           llvm::StringRef /*RelativePath*/,
                           const Module * /*Imported*/,
-                          SrcMgr::CharacteristicKind /*FileType*/) override {
-    if (SM.isInMainFile(HashLoc))
-      Out->MainFileIncludes.push_back({
-          halfOpenToRange(SM, FilenameRange),
-          (IsAngled ? "<" + FileName + ">" : "\"" + FileName + "\"").str(),
-          File ? File->tryGetRealPathName() : "",
-      });
+                          SrcMgr::CharacteristicKind FileKind) override {
+    if (SM.isWrittenInMainFile(HashLoc)) {
+      Out->MainFileIncludes.emplace_back();
+      auto &Inc = Out->MainFileIncludes.back();
+      Inc.R = halfOpenToRange(SM, FilenameRange);
+      Inc.Written =
+          (IsAngled ? "<" + FileName + ">" : "\"" + FileName + "\"").str();
+      Inc.Resolved = File ? File->tryGetRealPathName() : "";
+      Inc.HashOffset = SM.getFileOffset(HashLoc);
+      Inc.FileKind = FileKind;
+    }
     if (File) {
       auto *IncludingFileEntry = SM.getFileEntryForID(SM.getFileID(HashLoc));
       if (!IncludingFileEntry) {
@@ -161,12 +164,19 @@ IncludeInserter::calculateIncludePath(const HeaderFile &DeclaringHeader,
   return Suggested;
 }
 
-Optional<TextEdit> IncludeInserter::insert(StringRef VerbatimHeader) const {
-  Optional<TextEdit> Edit = None;
+llvm::Optional<TextEdit>
+IncludeInserter::insert(llvm::StringRef VerbatimHeader) const {
+  llvm::Optional<TextEdit> Edit = None;
   if (auto Insertion = Inserter.insert(VerbatimHeader.trim("\"<>"),
                                        VerbatimHeader.startswith("<")))
     Edit = replacementToEdit(Code, *Insertion);
   return Edit;
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Inclusion &Inc) {
+  return OS << Inc.Written << " = "
+            << (Inc.Resolved.empty() ? Inc.Resolved : "[unresolved]") << " at "
+            << Inc.R;
 }
 
 } // namespace clangd

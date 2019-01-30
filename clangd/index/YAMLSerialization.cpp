@@ -1,9 +1,8 @@
 //===--- SymbolYAML.cpp ------------------------------------------*- C++-*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,8 +18,11 @@
 #include "dex/Dex.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Allocator.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/StringSaver.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstdint>
@@ -36,6 +38,13 @@ struct VariantEntry {
   llvm::Optional<clang::clangd::Symbol> Symbol;
   llvm::Optional<RefBundle> Refs;
 };
+// A class helps YAML to serialize the 32-bit encoded position (Line&Column),
+// as YAMLIO can't directly map bitfields.
+struct YPosition {
+  uint32_t Line;
+  uint32_t Column;
+};
+
 } // namespace
 namespace llvm {
 namespace yaml {
@@ -94,18 +103,56 @@ struct NormalizedSymbolOrigin {
   uint8_t Origin = 0;
 };
 
-template <> struct MappingTraits<SymbolLocation::Position> {
-  static void mapping(IO &IO, SymbolLocation::Position &Value) {
+template <> struct MappingTraits<YPosition> {
+  static void mapping(IO &IO, YPosition &Value) {
     IO.mapRequired("Line", Value.Line);
     IO.mapRequired("Column", Value.Column);
   }
 };
 
+struct NormalizedPosition {
+  using Position = clang::clangd::SymbolLocation::Position;
+  NormalizedPosition(IO &) {}
+  NormalizedPosition(IO &, const Position &Pos) {
+    P.Line = Pos.line();
+    P.Column = Pos.column();
+  }
+
+  Position denormalize(IO &) {
+    Position Pos;
+    Pos.setLine(P.Line);
+    Pos.setColumn(P.Column);
+    return Pos;
+  }
+  YPosition P;
+};
+
+struct NormalizedFileURI {
+  NormalizedFileURI(IO &) {}
+  NormalizedFileURI(IO &, const char *FileURI) { URI = FileURI; }
+
+  const char *denormalize(IO &IO) {
+    assert(IO.getContext() &&
+           "Expecting an UniqueStringSaver to allocate data");
+    return static_cast<llvm::UniqueStringSaver *>(IO.getContext())
+        ->save(URI)
+        .data();
+  }
+
+  std::string URI;
+};
+
 template <> struct MappingTraits<SymbolLocation> {
   static void mapping(IO &IO, SymbolLocation &Value) {
-    IO.mapRequired("FileURI", Value.FileURI);
-    IO.mapRequired("Start", Value.Start);
-    IO.mapRequired("End", Value.End);
+    MappingNormalization<NormalizedFileURI, const char *> NFile(IO,
+                                                                Value.FileURI);
+    IO.mapRequired("FileURI", NFile->URI);
+    MappingNormalization<NormalizedPosition, SymbolLocation::Position> NStart(
+        IO, Value.Start);
+    IO.mapRequired("Start", NStart->P);
+    MappingNormalization<NormalizedPosition, SymbolLocation::Position> NEnd(
+        IO, Value.End);
+    IO.mapRequired("End", NEnd->P);
   }
 };
 
@@ -147,6 +194,7 @@ template <> struct MappingTraits<Symbol> {
     IO.mapOptional("CompletionSnippetSuffix", Sym.CompletionSnippetSuffix);
     IO.mapOptional("Documentation", Sym.Documentation);
     IO.mapOptional("ReturnType", Sym.ReturnType);
+    IO.mapOptional("Type", Sym.Type);
     IO.mapOptional("IncludeHeaders", Sym.IncludeHeaders);
   }
 };
@@ -243,7 +291,7 @@ template <> struct MappingTraits<VariantEntry> {
 namespace clang {
 namespace clangd {
 
-void writeYAML(const IndexFileOut &O, raw_ostream &OS) {
+void writeYAML(const IndexFileOut &O, llvm::raw_ostream &OS) {
   llvm::yaml::Output Yout(OS);
   for (const auto &Sym : *O.Symbols) {
     VariantEntry Entry;
@@ -258,21 +306,27 @@ void writeYAML(const IndexFileOut &O, raw_ostream &OS) {
     }
 }
 
-Expected<IndexFileIn> readYAML(StringRef Data) {
+llvm::Expected<IndexFileIn> readYAML(llvm::StringRef Data) {
   SymbolSlab::Builder Symbols;
   RefSlab::Builder Refs;
-  llvm::yaml::Input Yin(Data);
-  do {
+  llvm::BumpPtrAllocator
+      Arena; // store the underlying data of Position::FileURI.
+  llvm::UniqueStringSaver Strings(Arena);
+  llvm::yaml::Input Yin(Data, &Strings);
+  while (Yin.setCurrentDocument()) {
+    llvm::yaml::EmptyContext Ctx;
     VariantEntry Variant;
-    Yin >> Variant;
+    yamlize(Yin, Variant, true, Ctx);
     if (Yin.error())
       return llvm::errorCodeToError(Yin.error());
+
     if (Variant.Symbol)
       Symbols.insert(*Variant.Symbol);
     if (Variant.Refs)
       for (const auto &Ref : Variant.Refs->second)
         Refs.insert(Variant.Refs->first, Ref);
-  } while (Yin.nextDocument());
+    Yin.nextDocument();
+  }
 
   IndexFileIn Result;
   Result.Symbols.emplace(std::move(Symbols).build());
@@ -291,7 +345,7 @@ std::string toYAML(const Symbol &S) {
   return Buf;
 }
 
-std::string toYAML(const std::pair<SymbolID, ArrayRef<Ref>> &Data) {
+std::string toYAML(const std::pair<SymbolID, llvm::ArrayRef<Ref>> &Data) {
   RefBundle Refs = {Data.first, Data.second};
   std::string Buf;
   {

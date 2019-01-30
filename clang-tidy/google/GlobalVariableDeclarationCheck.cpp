@@ -1,9 +1,8 @@
 //===--- GlobalVariableDeclarationCheck.cpp - clang-tidy-------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -55,9 +54,9 @@ FixItHint generateFixItHint(const VarDecl *Decl, bool IsConst) {
 
 void GlobalVariableDeclarationCheck::registerMatchers(MatchFinder *Finder) {
   // The relevant Style Guide rule only applies to Objective-C.
-  if (!getLangOpts().ObjC1 && !getLangOpts().ObjC2) {
+  if (!getLangOpts().ObjC)
     return;
-  }
+
   // need to add two matchers since we need to bind different ids to distinguish
   // constants and variables. Since bind() can only be called on node matchers,
   // we cannot make it in one matcher.

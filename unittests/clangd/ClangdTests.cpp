@@ -1,15 +1,15 @@
 //===-- ClangdTests.cpp - Clangd unit tests ---------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
 #include "Annotations.h"
 #include "ClangdLSPServer.h"
 #include "ClangdServer.h"
+#include "GlobalCompilationDatabase.h"
 #include "Matchers.h"
 #include "SyncAPI.h"
 #include "TestFS.h"
@@ -33,6 +33,8 @@
 namespace clang {
 namespace clangd {
 
+namespace {
+
 using ::testing::ElementsAre;
 using ::testing::Eq;
 using ::testing::Field;
@@ -41,7 +43,9 @@ using ::testing::IsEmpty;
 using ::testing::Pair;
 using ::testing::UnorderedElementsAre;
 
-namespace {
+MATCHER_P2(FileRange, File, Range, "") {
+  return Location{URIForFile::canonicalize(File, testRoot()), Range} == arg;
+}
 
 bool diagsContainErrors(const std::vector<Diag> &Diagnostics) {
   for (auto D : Diagnostics) {
@@ -110,7 +114,7 @@ private:
 /// Replaces all patterns of the form 0x123abc with spaces
 std::string replacePtrsInDump(std::string const &Dump) {
   llvm::Regex RE("0x[0-9a-fA-F]+");
-  llvm::SmallVector<StringRef, 1> Matches;
+  llvm::SmallVector<llvm::StringRef, 1> Matches;
   llvm::StringRef Pending = Dump;
 
   std::string Result;
@@ -134,8 +138,8 @@ std::string dumpASTWithoutMemoryLocs(ClangdServer &Server, PathRef File) {
 class ClangdVFSTest : public ::testing::Test {
 protected:
   std::string parseSourceAndDumpAST(
-      PathRef SourceFileRelPath, StringRef SourceContents,
-      std::vector<std::pair<PathRef, StringRef>> ExtraFiles = {},
+      PathRef SourceFileRelPath, llvm::StringRef SourceContents,
+      std::vector<std::pair<PathRef, llvm::StringRef>> ExtraFiles = {},
       bool ExpectErrors = false) {
     MockFSProvider FS;
     ErrorCheckingDiagConsumer DiagConsumer;
@@ -456,8 +460,8 @@ int hello;
 
   auto Locations = runFindDefinitions(Server, FooCpp, FooSource.point());
   EXPECT_TRUE(bool(Locations));
-  EXPECT_THAT(*Locations, ElementsAre(Location{URIForFile{FooCpp},
-                                               FooSource.range("one")}));
+  EXPECT_THAT(*Locations,
+              ElementsAre(FileRange(FooCpp, FooSource.range("one"))));
 
   // Undefine MACRO, close baz.cpp.
   CDB.ExtraClangFlags.clear();
@@ -472,8 +476,8 @@ int hello;
 
   Locations = runFindDefinitions(Server, FooCpp, FooSource.point());
   EXPECT_TRUE(bool(Locations));
-  EXPECT_THAT(*Locations, ElementsAre(Location{URIForFile{FooCpp},
-                                               FooSource.range("two")}));
+  EXPECT_THAT(*Locations,
+              ElementsAre(FileRange(FooCpp, FooSource.range("two"))));
 }
 
 TEST_F(ClangdVFSTest, MemoryUsage) {
@@ -747,7 +751,8 @@ int d;
         BlockingRequests[RequestIndex]();
       }
     }
-  } // Wait for ClangdServer to shutdown before proceeding.
+    ASSERT_TRUE(Server.blockUntilIdleForTest());
+  }
 
   // Check some invariants about the state of the program.
   std::vector<FileStat> Stats = DiagConsumer.takeFileStats();
@@ -781,7 +786,7 @@ TEST_F(ClangdVFSTest, CheckSourceHeaderSwitch) {
   FS.Files[FooH] = "int a;";
   FS.Files[Invalid] = "int main() { \n return 0; \n }";
 
-  llvm::Optional<Path> PathResult = Server.switchSourceHeader(FooCpp);
+  Optional<Path> PathResult = Server.switchSourceHeader(FooCpp);
   EXPECT_TRUE(PathResult.hasValue());
   ASSERT_EQ(PathResult.getValue(), FooH);
 
@@ -1031,6 +1036,28 @@ TEST(ClangdTests, PreambleVFSStatCache) {
               ElementsAre(Field(&CodeCompletion::Name, "TestSym")));
 }
 #endif
+
+TEST_F(ClangdVFSTest, FlagsWithPlugins) {
+  MockFSProvider FS;
+  ErrorCheckingDiagConsumer DiagConsumer;
+  MockCompilationDatabase CDB;
+  CDB.ExtraClangFlags = {
+      "-Xclang",
+      "-add-plugin",
+      "-Xclang",
+      "random-plugin",
+  };
+  OverlayCDB OCDB(&CDB);
+  ClangdServer Server(OCDB, FS, DiagConsumer, ClangdServer::optsForTest());
+
+  auto FooCpp = testPath("foo.cpp");
+  const auto SourceContents = "int main() { return 0; }";
+  FS.Files[FooCpp] = FooCpp;
+  Server.addDocument(FooCpp, SourceContents);
+  auto Result = dumpASTWithoutMemoryLocs(Server, FooCpp);
+  EXPECT_TRUE(Server.blockUntilIdleForTest()) << "Waiting for diagnostics";
+  EXPECT_NE(Result, "<no-ast>");
+}
 
 } // namespace
 } // namespace clangd

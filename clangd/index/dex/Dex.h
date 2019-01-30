@@ -1,9 +1,8 @@
 //===--- Dex.h - Dex Symbol Index Implementation ----------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -43,15 +42,7 @@ class Dex : public SymbolIndex {
 public:
   // All data must outlive this index.
   template <typename SymbolRange, typename RefsRange>
-  Dex(SymbolRange &&Symbols, RefsRange &&Refs,
-      llvm::ArrayRef<std::string> Schemes)
-      : Corpus(0), URISchemes(Schemes) {
-    // If Schemes don't contain any items, fall back to SymbolCollector's
-    // default URI schemes.
-    if (URISchemes.empty()) {
-      SymbolCollector::Options Opts;
-      URISchemes = Opts.URISchemes;
-    }
+  Dex(SymbolRange &&Symbols, RefsRange &&Refs) : Corpus(0) {
     for (auto &&Sym : Symbols)
       this->Symbols.push_back(&Sym);
     for (auto &&Ref : Refs)
@@ -61,17 +52,15 @@ public:
   // Symbols and Refs are owned by BackingData, Index takes ownership.
   template <typename SymbolRange, typename RefsRange, typename Payload>
   Dex(SymbolRange &&Symbols, RefsRange &&Refs, Payload &&BackingData,
-      size_t BackingDataSize, llvm::ArrayRef<std::string> URISchemes)
-      : Dex(std::forward<SymbolRange>(Symbols), std::forward<RefsRange>(Refs),
-            URISchemes) {
+      size_t BackingDataSize)
+      : Dex(std::forward<SymbolRange>(Symbols), std::forward<RefsRange>(Refs)) {
     KeepAlive = std::shared_ptr<void>(
         std::make_shared<Payload>(std::move(BackingData)), nullptr);
     this->BackingDataSize = BackingDataSize;
   }
 
   /// Builds an index from slabs. The index takes ownership of the slab.
-  static std::unique_ptr<SymbolIndex>
-  build(SymbolSlab, RefSlab, llvm::ArrayRef<std::string> URISchemes);
+  static std::unique_ptr<SymbolIndex> build(SymbolSlab, RefSlab);
 
   bool
   fuzzyFind(const FuzzyFindRequest &Req,
@@ -106,8 +95,6 @@ private:
   std::shared_ptr<void> KeepAlive; // poor man's move-only std::any
   // Size of memory retained by KeepAlive.
   size_t BackingDataSize = 0;
-
-  std::vector<std::string> URISchemes;
 };
 
 /// Returns Search Token for a number of parent directories of given Path.

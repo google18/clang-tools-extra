@@ -1,9 +1,8 @@
 //===--- Diagnostics.cpp -----------------------------------------*- C++-*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -78,7 +77,7 @@ Range diagnosticRange(const clang::Diagnostic &D, const LangOptions &L) {
 }
 
 bool isInsideMainFile(const SourceLocation Loc, const SourceManager &M) {
-  return Loc.isValid() && M.isInMainFile(Loc);
+  return Loc.isValid() && M.isWrittenInMainFile(M.getFileLoc(Loc));
 }
 
 bool isInsideMainFile(const clang::Diagnostic &D) {
@@ -189,8 +188,11 @@ std::string noteMessage(const Diag &Main, const DiagBase &Note) {
 } // namespace
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const DiagBase &D) {
+  OS << "[";
   if (!D.InsideMainFile)
-    OS << "[in " << D.File << "] ";
+    OS << D.File << ":";
+  OS << D.Range.start << "-" << D.Range.end << "] ";
+
   return OS << D.Message;
 }
 
@@ -226,20 +228,37 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Diag &D) {
   return OS;
 }
 
+CodeAction toCodeAction(const Fix &F, const URIForFile &File) {
+  CodeAction Action;
+  Action.title = F.Message;
+  Action.kind = CodeAction::QUICKFIX_KIND;
+  Action.edit.emplace();
+  Action.edit->changes.emplace();
+  (*Action.edit->changes)[File.uri()] = {F.Edits.begin(), F.Edits.end()};
+  return Action;
+}
+
 void toLSPDiags(
-    const Diag &D,
+    const Diag &D, const URIForFile &File, const ClangdDiagnosticOptions &Opts,
     llvm::function_ref<void(clangd::Diagnostic, llvm::ArrayRef<Fix>)> OutFn) {
   auto FillBasicFields = [](const DiagBase &D) -> clangd::Diagnostic {
     clangd::Diagnostic Res;
     Res.range = D.Range;
     Res.severity = getSeverity(D.Severity);
-    Res.category = D.Category;
     return Res;
   };
 
   {
     clangd::Diagnostic Main = FillBasicFields(D);
     Main.message = mainMessage(D);
+    if (Opts.EmbedFixesInDiagnostics) {
+      Main.codeActions.emplace();
+      for (const auto &Fix : D.Fixes)
+        Main.codeActions->push_back(toCodeAction(Fix, File));
+    }
+    if (Opts.SendDiagnosticCategory && !D.Category.empty())
+      Main.category = D.Category;
+
     OutFn(std::move(Main), D.Fixes);
   }
 
@@ -278,7 +297,7 @@ void StoreDiags::BeginSourceFile(const LangOptions &Opts,
 
 void StoreDiags::EndSourceFile() {
   flushLastDiag();
-  LangOpts = llvm::None;
+  LangOpts = None;
 }
 
 void StoreDiags::HandleDiagnostic(DiagnosticsEngine::Level DiagLevel,
@@ -325,9 +344,9 @@ void StoreDiags::HandleDiagnostic(DiagnosticsEngine::Level DiagLevel,
     if (SyntheticMessage && Info.getNumFixItHints() == 1) {
       const auto &FixIt = Info.getFixItHint(0);
       bool Invalid = false;
-      StringRef Remove = Lexer::getSourceText(
+      llvm::StringRef Remove = Lexer::getSourceText(
           FixIt.RemoveRange, Info.getSourceManager(), *LangOpts, &Invalid);
-      StringRef Insert = FixIt.CodeToInsert;
+      llvm::StringRef Insert = FixIt.CodeToInsert;
       if (!Invalid) {
         llvm::raw_svector_ostream M(Message);
         if (!Remove.empty() && !Insert.empty())
@@ -384,8 +403,8 @@ void StoreDiags::flushLastDiag() {
   if (mentionsMainFile(*LastDiag))
     Output.push_back(std::move(*LastDiag));
   else
-    log("Dropped diagnostic outside main file: {0}: {1}", LastDiag->File,
-        LastDiag->Message);
+    vlog("Dropped diagnostic outside main file: {0}: {1}", LastDiag->File,
+         LastDiag->Message);
   LastDiag.reset();
 }
 

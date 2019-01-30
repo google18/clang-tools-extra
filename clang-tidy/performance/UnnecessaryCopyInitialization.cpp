@@ -1,9 +1,8 @@
 //===--- UnnecessaryCopyInitialization.cpp - clang-tidy--------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -39,10 +38,6 @@ UnnecessaryCopyInitialization::UnnecessaryCopyInitialization(
 
 void UnnecessaryCopyInitialization::registerMatchers(MatchFinder *Finder) {
   auto ConstReference = referenceType(pointee(qualType(isConstQualified())));
-  auto ConstOrConstReference =
-      allOf(anyOf(ConstReference, isConstQualified()),
-            unless(allOf(pointerType(), unless(pointerType(pointee(
-                                            qualType(isConstQualified())))))));
 
   // Match method call expressions where the `this` argument is only used as
   // const, this will be checked in `check()` part. This returned const
@@ -63,11 +58,11 @@ void UnnecessaryCopyInitialization::registerMatchers(MatchFinder *Finder) {
                    declStmt(
                        has(varDecl(hasLocalStorage(),
                                    hasType(qualType(
-                                       allOf(hasCanonicalType(
-                                                 matchers::isExpensiveToCopy()),
-                                             unless(hasDeclaration(namedDecl(
-                                                 matchers::matchesAnyListedName(
-                                                     AllowedTypes))))))),
+                                       hasCanonicalType(
+                                           matchers::isExpensiveToCopy()),
+                                       unless(hasDeclaration(namedDecl(
+                                           matchers::matchesAnyListedName(
+                                               AllowedTypes)))))),
                                    unless(isImplicit()),
                                    hasInitializer(
                                        cxxConstructExpr(

@@ -1,9 +1,8 @@
 //===-- DraftStoreTests.cpp -------------------------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -18,11 +17,11 @@ namespace clangd {
 namespace {
 
 struct IncrementalTestStep {
-  StringRef Src;
-  StringRef Contents;
+  llvm::StringRef Src;
+  llvm::StringRef Contents;
 };
 
-int rangeLength(StringRef Code, const Range &Rng) {
+int rangeLength(llvm::StringRef Code, const Range &Rng) {
   llvm::Expected<size_t> Start = positionToOffset(Code, Rng.start);
   llvm::Expected<size_t> End = positionToOffset(Code, Rng.end);
   assert(Start);
@@ -42,7 +41,7 @@ void stepByStep(llvm::ArrayRef<IncrementalTestStep> Steps) {
   for (size_t i = 1; i < Steps.size(); i++) {
     Annotations SrcBefore(Steps[i - 1].Src);
     Annotations SrcAfter(Steps[i].Src);
-    StringRef Contents = Steps[i - 1].Contents;
+    llvm::StringRef Contents = Steps[i - 1].Contents;
     TextDocumentContentChangeEvent Event{
         SrcBefore.range(),
         rangeLength(SrcBefore.code(), SrcBefore.range()),
@@ -66,7 +65,7 @@ void allAtOnce(llvm::ArrayRef<IncrementalTestStep> Steps) {
 
   for (size_t i = 0; i < Steps.size() - 1; i++) {
     Annotations Src(Steps[i].Src);
-    StringRef Contents = Steps[i].Contents;
+    llvm::StringRef Contents = Steps[i].Contents;
 
     Changes.push_back({
         Src.range(),
@@ -195,11 +194,11 @@ TEST(DraftStoreIncrementalUpdateTest, WrongRangeLength) {
   Change.range->end.character = 2;
   Change.rangeLength = 10;
 
-  llvm::Expected<std::string> Result = DS.updateDraft(File, {Change});
+  Expected<std::string> Result = DS.updateDraft(File, {Change});
 
   EXPECT_TRUE(!Result);
   EXPECT_EQ(
-      llvm::toString(Result.takeError()),
+      toString(Result.takeError()),
       "Change's rangeLength (10) doesn't match the computed range length (2).");
 }
 
@@ -216,10 +215,10 @@ TEST(DraftStoreIncrementalUpdateTest, EndBeforeStart) {
   Change.range->end.line = 0;
   Change.range->end.character = 3;
 
-  llvm::Expected<std::string> Result = DS.updateDraft(File, {Change});
+  Expected<std::string> Result = DS.updateDraft(File, {Change});
 
   EXPECT_TRUE(!Result);
-  EXPECT_EQ(llvm::toString(Result.takeError()),
+  EXPECT_EQ(toString(Result.takeError()),
             "Range's end position (0:3) is before start position (0:5)");
 }
 
@@ -237,10 +236,10 @@ TEST(DraftStoreIncrementalUpdateTest, StartCharOutOfRange) {
   Change.range->end.character = 100;
   Change.text = "foo";
 
-  llvm::Expected<std::string> Result = DS.updateDraft(File, {Change});
+  Expected<std::string> Result = DS.updateDraft(File, {Change});
 
   EXPECT_TRUE(!Result);
-  EXPECT_EQ(llvm::toString(Result.takeError()),
+  EXPECT_EQ(toString(Result.takeError()),
             "UTF-16 offset 100 is invalid for line 0");
 }
 
@@ -258,10 +257,10 @@ TEST(DraftStoreIncrementalUpdateTest, EndCharOutOfRange) {
   Change.range->end.character = 100;
   Change.text = "foo";
 
-  llvm::Expected<std::string> Result = DS.updateDraft(File, {Change});
+  Expected<std::string> Result = DS.updateDraft(File, {Change});
 
   EXPECT_TRUE(!Result);
-  EXPECT_EQ(llvm::toString(Result.takeError()),
+  EXPECT_EQ(toString(Result.takeError()),
             "UTF-16 offset 100 is invalid for line 0");
 }
 
@@ -279,11 +278,10 @@ TEST(DraftStoreIncrementalUpdateTest, StartLineOutOfRange) {
   Change.range->end.character = 0;
   Change.text = "foo";
 
-  llvm::Expected<std::string> Result = DS.updateDraft(File, {Change});
+  Expected<std::string> Result = DS.updateDraft(File, {Change});
 
   EXPECT_TRUE(!Result);
-  EXPECT_EQ(llvm::toString(Result.takeError()),
-            "Line value is out of range (100)");
+  EXPECT_EQ(toString(Result.takeError()), "Line value is out of range (100)");
 }
 
 TEST(DraftStoreIncrementalUpdateTest, EndLineOutOfRange) {
@@ -300,11 +298,10 @@ TEST(DraftStoreIncrementalUpdateTest, EndLineOutOfRange) {
   Change.range->end.character = 0;
   Change.text = "foo";
 
-  llvm::Expected<std::string> Result = DS.updateDraft(File, {Change});
+  Expected<std::string> Result = DS.updateDraft(File, {Change});
 
   EXPECT_TRUE(!Result);
-  EXPECT_EQ(llvm::toString(Result.takeError()),
-            "Line value is out of range (100)");
+  EXPECT_EQ(toString(Result.takeError()), "Line value is out of range (100)");
 }
 
 /// Check that if a valid change is followed by an invalid change, the original
@@ -334,13 +331,13 @@ TEST(DraftStoreIncrementalUpdateTest, InvalidRangeInASequence) {
   Change2.range->end.character = 100;
   Change2.text = "something";
 
-  llvm::Expected<std::string> Result = DS.updateDraft(File, {Change1, Change2});
+  Expected<std::string> Result = DS.updateDraft(File, {Change1, Change2});
 
   EXPECT_TRUE(!Result);
-  EXPECT_EQ(llvm::toString(Result.takeError()),
+  EXPECT_EQ(toString(Result.takeError()),
             "UTF-16 offset 100 is invalid for line 0");
 
-  llvm::Optional<std::string> Contents = DS.getDraft(File);
+  Optional<std::string> Contents = DS.getDraft(File);
   EXPECT_TRUE(Contents);
   EXPECT_EQ(*Contents, OriginalContents);
 }

@@ -1,9 +1,8 @@
 //===--- IndexerMain.cpp -----------------------------------------*- C++-*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,10 +20,6 @@
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Signals.h"
-
-using namespace llvm;
-using namespace clang::tooling;
-using clang::clangd::SymbolSlab;
 
 namespace clang {
 namespace clangd {
@@ -63,7 +58,8 @@ public:
                    for (const auto &Ref : Sym.second)
                      Refs.insert(Sym.first, Ref);
                  }
-               })
+               },
+               /*IncludeGraphCallback=*/nullptr)
         .release();
   }
 
@@ -103,7 +99,7 @@ int main(int argc, const char **argv) {
   )";
 
   auto Executor = clang::tooling::createExecutorFromCommandLineArgs(
-      argc, argv, cl::GeneralCategory, Overview);
+      argc, argv, llvm::cl::GeneralCategory, Overview);
 
   if (!Executor) {
     llvm::errs() << llvm::toString(Executor.takeError()) << "\n";

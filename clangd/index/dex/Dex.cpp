@@ -1,9 +1,8 @@
 //===--- Dex.cpp - Dex Symbol Index Implementation --------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,13 +23,10 @@ namespace clang {
 namespace clangd {
 namespace dex {
 
-std::unique_ptr<SymbolIndex>
-Dex::build(SymbolSlab Symbols, RefSlab Refs,
-           llvm::ArrayRef<std::string> URISchemes) {
+std::unique_ptr<SymbolIndex> Dex::build(SymbolSlab Symbols, RefSlab Refs) {
   auto Size = Symbols.bytes() + Refs.bytes();
   auto Data = std::make_pair(std::move(Symbols), std::move(Refs));
-  return llvm::make_unique<Dex>(Data.first, Data.second, std::move(Data), Size,
-                                std::move(URISchemes));
+  return llvm::make_unique<Dex>(Data.first, Data.second, std::move(Data), Size);
 }
 
 namespace {
@@ -52,7 +48,7 @@ std::vector<Token> generateSearchTokens(const Symbol &Sym) {
   std::vector<Token> Result = generateIdentifierTrigrams(Sym.Name);
   Result.emplace_back(Token::Kind::Scope, Sym.Scope);
   // Skip token generation for symbols with unknown declaration location.
-  if (!Sym.CanonicalDeclaration.FileURI.empty())
+  if (!llvm::StringRef(Sym.CanonicalDeclaration.FileURI).empty())
     for (const auto &ProximityURI :
          generateProximityURIs(Sym.CanonicalDeclaration.FileURI))
       Result.emplace_back(Token::Kind::ProximityURI, ProximityURI);
@@ -64,7 +60,6 @@ std::vector<Token> generateSearchTokens(const Symbol &Sym) {
 // Constructs BOOST iterators for Path Proximities.
 std::unique_ptr<Iterator> createFileProximityIterator(
     llvm::ArrayRef<std::string> ProximityPaths,
-    llvm::ArrayRef<std::string> URISchemes,
     const llvm::DenseMap<Token, PostingList> &InvertedIndex,
     const Corpus &Corpus) {
   std::vector<std::unique_ptr<Iterator>> BoostingIterators;
@@ -73,15 +68,8 @@ std::unique_ptr<Iterator> createFileProximityIterator(
   llvm::StringMap<SourceParams> Sources;
   for (const auto &Path : ProximityPaths) {
     Sources[Path] = SourceParams();
-    auto PathURI = URI::create(Path, URISchemes);
-    if (!PathURI) {
-      elog("Given ProximityPath {0} is can not be converted to any known URI "
-           "scheme. fuzzyFind request will ignore it.",
-           Path);
-      llvm::consumeError(PathURI.takeError());
-      continue;
-    }
-    const auto PathProximityURIs = generateProximityURIs(PathURI->toString());
+    auto PathURI = URI::create(Path);
+    const auto PathProximityURIs = generateProximityURIs(PathURI.toString());
     for (const auto &ProximityURI : PathProximityURIs)
       ParentURIs.insert(ProximityURI);
   }
@@ -180,14 +168,14 @@ bool Dex::fuzzyFind(const FuzzyFindRequest &Req,
   std::vector<std::unique_ptr<Iterator>> ScopeIterators;
   for (const auto &Scope : Req.Scopes)
     ScopeIterators.push_back(iterator(Token(Token::Kind::Scope, Scope)));
-  if (Req.AnyScope || /*legacy*/ Req.Scopes.empty())
+  if (Req.AnyScope)
     ScopeIterators.push_back(
         Corpus.boost(Corpus.all(), ScopeIterators.empty() ? 1.0 : 0.2));
   Criteria.push_back(Corpus.unionOf(move(ScopeIterators)));
 
   // Add proximity paths boosting (all symbols, some boosted).
-  Criteria.push_back(createFileProximityIterator(Req.ProximityPaths, URISchemes,
-                                                 InvertedIndex, Corpus));
+  Criteria.push_back(
+      createFileProximityIterator(Req.ProximityPaths, InvertedIndex, Corpus));
 
   if (Req.RestrictForCodeCompletion)
     Criteria.push_back(iterator(RestrictedForCodeCompletion));
@@ -247,10 +235,15 @@ void Dex::lookup(const LookupRequest &Req,
 void Dex::refs(const RefsRequest &Req,
                llvm::function_ref<void(const Ref &)> Callback) const {
   trace::Span Tracer("Dex refs");
+  uint32_t Remaining =
+      Req.Limit.getValueOr(std::numeric_limits<uint32_t>::max());
   for (const auto &ID : Req.IDs)
-    for (const auto &Ref : Refs.lookup(ID))
-      if (static_cast<int>(Req.Filter & Ref.Kind))
+    for (const auto &Ref : Refs.lookup(ID)) {
+      if (Remaining > 0 && static_cast<int>(Req.Filter & Ref.Kind)) {
+        --Remaining;
         Callback(Ref);
+      }
+    }
 }
 
 size_t Dex::estimateMemoryUsage() const {
@@ -270,7 +263,7 @@ std::vector<std::string> generateProximityURIs(llvm::StringRef URIPath) {
   assert(ParsedURI &&
          "Non-empty argument of generateProximityURIs() should be a valid "
          "URI.");
-  StringRef Body = ParsedURI->body();
+  llvm::StringRef Body = ParsedURI->body();
   // FIXME(kbobyrev): Currently, this is a heuristic which defines the maximum
   // size of resulting vector. Some projects might want to have higher limit if
   // the file hierarchy is deeper. For the generic case, it would be useful to

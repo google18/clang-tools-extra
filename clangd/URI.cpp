@@ -1,9 +1,8 @@
 //===---- URI.h - File URIs with schemes -------------------------*- C++-*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,10 +30,10 @@ inline llvm::Error make_string_error(const llvm::Twine &Message) {
 
 /// \brief This manages file paths in the file system. All paths in the scheme
 /// are absolute (with leading '/').
+/// Note that this scheme is hardcoded into the library and not registered in
+/// registry.
 class FileSystemScheme : public URIScheme {
 public:
-  static const char *Scheme;
-
   llvm::Expected<std::string>
   getAbsolutePath(llvm::StringRef /*Authority*/, llvm::StringRef Body,
                   llvm::StringRef /*HintPath*/) const override {
@@ -52,25 +51,20 @@ public:
 
   llvm::Expected<URI>
   uriFromAbsolutePath(llvm::StringRef AbsolutePath) const override {
-    using namespace llvm::sys;
-
     std::string Body;
     // For Windows paths e.g. X:
     if (AbsolutePath.size() > 1 && AbsolutePath[1] == ':')
       Body = "/";
-    Body += path::convert_to_slash(AbsolutePath);
-    return URI(Scheme, /*Authority=*/"", Body);
+    Body += llvm::sys::path::convert_to_slash(AbsolutePath);
+    return URI("file", /*Authority=*/"", Body);
   }
 };
 
-const char *FileSystemScheme::Scheme = "file";
-
-static URISchemeRegistry::Add<FileSystemScheme>
-    X(FileSystemScheme::Scheme,
-      "URI scheme for absolute paths in the file system.");
-
 llvm::Expected<std::unique_ptr<URIScheme>>
 findSchemeByName(llvm::StringRef Scheme) {
+  if (Scheme == "file")
+    return llvm::make_unique<FileSystemScheme>();
+
   for (auto I = URISchemeRegistry::begin(), E = URISchemeRegistry::end();
        I != E; ++I) {
     if (I->getName() != Scheme)
@@ -107,7 +101,7 @@ std::string percentEncode(llvm::StringRef Content) {
   llvm::raw_string_ostream OS(Result);
   for (unsigned char C : Content)
     if (shouldEscape(C))
-      OS << '%' << llvm::format_hex_no_prefix(C, 2, /*Upper = */true);
+      OS << '%' << llvm::format_hex_no_prefix(C, 2, /*Upper = */ true);
     else
       OS << C;
 
@@ -200,12 +194,12 @@ llvm::Expected<URI> URI::create(llvm::StringRef AbsolutePath,
   return S->get()->uriFromAbsolutePath(AbsolutePath);
 }
 
-llvm::Expected<URI> URI::create(llvm::StringRef AbsolutePath,
-                                const std::vector<std::string> &Schemes) {
+URI URI::create(llvm::StringRef AbsolutePath) {
   if (!llvm::sys::path::is_absolute(AbsolutePath))
-    return make_string_error("Not a valid absolute path: " + AbsolutePath);
-  for (const auto &Scheme : Schemes) {
-    auto URI = URI::create(AbsolutePath, Scheme);
+    llvm_unreachable(
+        ("Not a valid absolute path: " + AbsolutePath).str().c_str());
+  for (auto &Entry : URISchemeRegistry::entries()) {
+    auto URI = Entry.instantiate()->uriFromAbsolutePath(AbsolutePath);
     // For some paths, conversion to different URI schemes is impossible. These
     // should be just skipped.
     if (!URI) {
@@ -213,15 +207,14 @@ llvm::Expected<URI> URI::create(llvm::StringRef AbsolutePath,
       llvm::consumeError(URI.takeError());
       continue;
     }
-    return URI;
+    return std::move(*URI);
   }
-  return make_string_error(
-      "Couldn't convert " + AbsolutePath +
-      " to any given scheme: " + llvm::join(Schemes, ", "));
+  // Fallback to file: scheme which should work for any paths.
+  return URI::createFile(AbsolutePath);
 }
 
 URI URI::createFile(llvm::StringRef AbsolutePath) {
-  auto U = create(AbsolutePath, "file");
+  auto U = FileSystemScheme().uriFromAbsolutePath(AbsolutePath);
   if (!U)
     llvm_unreachable(llvm::toString(U.takeError()).c_str());
   return std::move(*U);
@@ -233,6 +226,26 @@ llvm::Expected<std::string> URI::resolve(const URI &Uri,
   if (!S)
     return S.takeError();
   return S->get()->getAbsolutePath(Uri.Authority, Uri.Body, HintPath);
+}
+
+llvm::Expected<std::string> URI::resolvePath(llvm::StringRef AbsPath,
+                                             llvm::StringRef HintPath) {
+  if (!llvm::sys::path::is_absolute(AbsPath))
+    llvm_unreachable(("Not a valid absolute path: " + AbsPath).str().c_str());
+  for (auto &Entry : URISchemeRegistry::entries()) {
+    auto S = Entry.instantiate();
+    auto U = S->uriFromAbsolutePath(AbsPath);
+    // For some paths, conversion to different URI schemes is impossible. These
+    // should be just skipped.
+    if (!U) {
+      // Ignore the error.
+      llvm::consumeError(U.takeError());
+      continue;
+    }
+    return S->getAbsolutePath(U->Authority, U->Body, HintPath);
+  }
+  // Fallback to file: scheme which doesn't do any canonicalization.
+  return AbsPath;
 }
 
 llvm::Expected<std::string> URI::includeSpelling(const URI &Uri) {

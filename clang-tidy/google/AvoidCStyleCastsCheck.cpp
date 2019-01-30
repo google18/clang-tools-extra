@@ -1,9 +1,8 @@
 //===--- AvoidCStyleCastsCheck.cpp - clang-tidy -----------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -101,7 +100,7 @@ void AvoidCStyleCastsCheck::check(const MatchFinder::MatchResult &Result) {
 
   // The rest of this check is only relevant to C++.
   // We also disable it for Objective-C++.
-  if (!getLangOpts().CPlusPlus || getLangOpts().ObjC1 || getLangOpts().ObjC2)
+  if (!getLangOpts().CPlusPlus || getLangOpts().ObjC)
     return;
   // Ignore code inside extern "C" {} blocks.
   if (!match(expr(hasAncestor(linkageSpecDecl())), *CastExpr, *Result.Context)
@@ -187,7 +186,7 @@ void AvoidCStyleCastsCheck::check(const MatchFinder::MatchResult &Result) {
       }
       break;
     }
-  // FALLTHROUGH
+    LLVM_FALLTHROUGH;
   case clang::CK_IntegralCast:
     // Convert integral and no-op casts between builtin types and enums to
     // static_cast. A cast from enum to integer may be unnecessary, but it's

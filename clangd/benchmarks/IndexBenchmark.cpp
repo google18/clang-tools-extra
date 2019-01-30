@@ -1,9 +1,8 @@
 //===--- IndexBenchmark.cpp - Clangd index benchmarks -----------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -26,11 +25,11 @@ namespace clangd {
 namespace {
 
 std::unique_ptr<SymbolIndex> buildMem() {
-  return loadIndex(IndexFilename, {}, false);
+  return loadIndex(IndexFilename, /*UseDex=*/false);
 }
 
 std::unique_ptr<SymbolIndex> buildDex() {
-  return loadIndex(IndexFilename, {}, true);
+  return loadIndex(IndexFilename, /*UseDex=*/true);
 }
 
 // Reads JSON array of serialized FuzzyFindRequest's from user-provided file.

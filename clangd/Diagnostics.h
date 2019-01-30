@@ -1,9 +1,8 @@
 //===--- Diagnostics.h -------------------------------------------*- C++-*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -78,8 +77,11 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Diag &D);
 /// file do not have a corresponding LSP diagnostic, but can still be included
 /// as part of their main diagnostic's message.
 void toLSPDiags(
-    const Diag &D,
+    const Diag &D, const URIForFile &File, const ClangdDiagnosticOptions &Opts,
     llvm::function_ref<void(clangd::Diagnostic, llvm::ArrayRef<Fix>)> OutFn);
+
+/// Convert from Fix to LSP CodeAction.
+CodeAction toCodeAction(const Fix &D, const URIForFile &File);
 
 /// Convert from clang diagnostic level to LSP severity.
 int getSeverity(DiagnosticsEngine::Level L);

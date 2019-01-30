@@ -1,9 +1,8 @@
 //===--- tools/extra/clang-tidy/ClangTidy.cpp - Clang tidy tool -----------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -441,7 +440,9 @@ DiagnosticBuilder ClangTidyCheck::diag(SourceLocation Loc, StringRef Message,
 }
 
 void ClangTidyCheck::run(const ast_matchers::MatchFinder::MatchResult &Result) {
-  Context->setSourceManager(Result.SourceManager);
+  // For historical reasons, checks don't implement the MatchFinder run()
+  // callback directly. We keep the run()/check() distinction to avoid interface
+  // churn, and to allow us to add cross-cutting logic in the future.
   check(Result);
 }
 
@@ -500,11 +501,12 @@ getCheckOptions(const ClangTidyOptions &Options,
   return Factory.getCheckOptions();
 }
 
-void runClangTidy(clang::tidy::ClangTidyContext &Context,
-                  const CompilationDatabase &Compilations,
-                  ArrayRef<std::string> InputFiles,
-                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS,
-                  bool EnableCheckProfile, llvm::StringRef StoreCheckProfile) {
+std::vector<ClangTidyError>
+runClangTidy(clang::tidy::ClangTidyContext &Context,
+             const CompilationDatabase &Compilations,
+             ArrayRef<std::string> InputFiles,
+             llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS,
+             bool EnableCheckProfile, llvm::StringRef StoreCheckProfile) {
   ClangTool Tool(Compilations, InputFiles,
                  std::make_shared<PCHContainerOperations>(), BaseFS);
 
@@ -526,29 +528,15 @@ void runClangTidy(clang::tidy::ClangTidyContext &Context,
         return AdjustedArgs;
       };
 
-  // Remove plugins arguments.
-  ArgumentsAdjuster PluginArgumentsRemover =
-      [](const CommandLineArguments &Args, StringRef Filename) {
-        CommandLineArguments AdjustedArgs;
-        for (size_t I = 0, E = Args.size(); I < E; ++I) {
-          if (I + 4 < Args.size() && Args[I] == "-Xclang" &&
-              (Args[I + 1] == "-load" || Args[I + 1] == "-add-plugin" ||
-               StringRef(Args[I + 1]).startswith("-plugin-arg-")) &&
-              Args[I + 2] == "-Xclang") {
-            I += 3;
-          } else
-            AdjustedArgs.push_back(Args[I]);
-        }
-        return AdjustedArgs;
-      };
-
   Tool.appendArgumentsAdjuster(PerFileExtraArgumentsInserter);
-  Tool.appendArgumentsAdjuster(PluginArgumentsRemover);
+  Tool.appendArgumentsAdjuster(getStripPluginsAdjuster());
   Context.setEnableProfiling(EnableCheckProfile);
   Context.setProfileStoragePrefix(StoreCheckProfile);
 
   ClangTidyDiagnosticConsumer DiagConsumer(Context);
-
+  DiagnosticsEngine DE(new DiagnosticIDs(), new DiagnosticOptions(),
+                       &DiagConsumer, /*ShouldOwnClient=*/false);
+  Context.setDiagnosticsEngine(&DE);
   Tool.setDiagnosticConsumer(&DiagConsumer);
 
   class ActionFactory : public FrontendActionFactory {
@@ -586,9 +574,11 @@ void runClangTidy(clang::tidy::ClangTidyContext &Context,
 
   ActionFactory Factory(Context);
   Tool.run(&Factory);
+  return DiagConsumer.take();
 }
 
-void handleErrors(ClangTidyContext &Context, bool Fix,
+void handleErrors(llvm::ArrayRef<ClangTidyError> Errors,
+                  ClangTidyContext &Context, bool Fix,
                   unsigned &WarningsAsErrorsCount,
                   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS) {
   ErrorReporter Reporter(Context, Fix, BaseFS);
@@ -598,7 +588,7 @@ void handleErrors(ClangTidyContext &Context, bool Fix,
   if (!InitialWorkingDir)
     llvm::report_fatal_error("Cannot get current working path.");
 
-  for (const ClangTidyError &Error : Context.getErrors()) {
+  for (const ClangTidyError &Error : Errors) {
     if (!Error.BuildDirectory.empty()) {
       // By default, the working directory of file system is the current
       // clang-tidy running directory.

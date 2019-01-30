@@ -1,9 +1,8 @@
 //===--- RedundantSmartptrGetCheck.cpp - clang-tidy -----------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -91,6 +90,11 @@ void registerMatchersForGetEquals(MatchFinder *Finder,
 
 } // namespace
 
+void RedundantSmartptrGetCheck::storeOptions(
+    ClangTidyOptions::OptionMap &Opts) {
+  Options.store(Opts, "IgnoreMacros", IgnoreMacros);
+}
+
 void RedundantSmartptrGetCheck::registerMatchers(MatchFinder *Finder) {
   // Only register the matchers for C++; the functionality currently does not
   // provide any benefit to other languages, despite being benign.
@@ -126,6 +130,9 @@ void RedundantSmartptrGetCheck::check(const MatchFinder::MatchResult &Result) {
   bool IsPtrToPtr = Result.Nodes.getNodeAs<Decl>("ptr_to_ptr") != nullptr;
   bool IsMemberExpr = Result.Nodes.getNodeAs<Expr>("memberExpr") != nullptr;
   const auto *GetCall = Result.Nodes.getNodeAs<Expr>("redundant_get");
+  if (GetCall->getBeginLoc().isMacroID() && IgnoreMacros)
+    return;
+
   const auto *Smartptr = Result.Nodes.getNodeAs<Expr>("smart_pointer");
 
   if (IsPtrToPtr && IsMemberExpr) {

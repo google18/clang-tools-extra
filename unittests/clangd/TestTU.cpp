@@ -1,9 +1,8 @@
 //===--- TestTU.cpp - Scratch source files for testing --------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -18,7 +17,6 @@
 
 namespace clang {
 namespace clangd {
-using namespace llvm;
 
 ParsedAST TestTU::build() const {
   std::string FullFilename = testPath(Filename),
@@ -31,11 +29,24 @@ ParsedAST TestTU::build() const {
     Cmd.push_back(FullHeaderName.c_str());
   }
   Cmd.insert(Cmd.end(), ExtraArgs.begin(), ExtraArgs.end());
-  auto AST = ParsedAST::build(
-      createInvocationFromCommandLine(Cmd), nullptr,
-      MemoryBuffer::getMemBufferCopy(Code),
-      std::make_shared<PCHContainerOperations>(),
-      buildTestFS({{FullFilename, Code}, {FullHeaderName, HeaderCode}}));
+  ParseInputs Inputs;
+  Inputs.CompileCommand.Filename = FullFilename;
+  Inputs.CompileCommand.CommandLine = {Cmd.begin(), Cmd.end()};
+  Inputs.CompileCommand.Directory = testRoot();
+  Inputs.Contents = Code;
+  Inputs.FS = buildTestFS({{FullFilename, Code}, {FullHeaderName, HeaderCode}});
+  Inputs.ClangTidyOpts = tidy::ClangTidyOptions::getDefaults();
+  Inputs.ClangTidyOpts.Checks = ClangTidyChecks;
+  auto PCHs = std::make_shared<PCHContainerOperations>();
+  auto CI = buildCompilerInvocation(Inputs);
+  assert(CI && "Failed to build compilation invocation.");
+  auto Preamble =
+      buildPreamble(FullFilename, *CI,
+                    /*OldPreamble=*/nullptr,
+                    /*OldCompileCommand=*/Inputs.CompileCommand, Inputs, PCHs,
+                    /*StoreInMemory=*/true, /*PreambleCallback=*/nullptr);
+  auto AST = buildAST(FullFilename, createInvocationFromCommandLine(Cmd),
+                      Inputs, Preamble, PCHs);
   if (!AST.hasValue()) {
     ADD_FAILURE() << "Failed to build code:\n" << Code;
     llvm_unreachable("Failed to build TestTU!");
@@ -50,7 +61,7 @@ SymbolSlab TestTU::headerSymbols() const {
 
 std::unique_ptr<SymbolIndex> TestTU::index() const {
   auto AST = build();
-  auto Idx = llvm::make_unique<FileIndex>();
+  auto Idx = llvm::make_unique<FileIndex>(/*UseDex=*/true);
   Idx->updatePreamble(Filename, AST.getASTContext(), AST.getPreprocessorPtr());
   Idx->updateMain(Filename, AST);
   return std::move(Idx);
@@ -98,20 +109,19 @@ const NamedDecl &findDecl(ParsedAST &AST, llvm::StringRef QName) {
   return LookupDecl(*Scope, Components.back());
 }
 
-const NamedDecl &findAnyDecl(ParsedAST &AST,
-                             std::function<bool(const NamedDecl &)> Callback) {
+const NamedDecl &findDecl(ParsedAST &AST,
+                          std::function<bool(const NamedDecl &)> Filter) {
   struct Visitor : RecursiveASTVisitor<Visitor> {
-    decltype(Callback) CB;
+    decltype(Filter) F;
     llvm::SmallVector<const NamedDecl *, 1> Decls;
     bool VisitNamedDecl(const NamedDecl *ND) {
-      if (CB(*ND))
+      if (F(*ND))
         Decls.push_back(ND);
       return true;
     }
   } Visitor;
-  Visitor.CB = Callback;
-  for (Decl *D : AST.getLocalTopLevelDecls())
-    Visitor.TraverseDecl(D);
+  Visitor.F = Filter;
+  Visitor.TraverseDecl(AST.getASTContext().getTranslationUnitDecl());
   if (Visitor.Decls.size() != 1) {
     ADD_FAILURE() << Visitor.Decls.size() << " symbols matched.";
     assert(Visitor.Decls.size() == 1);
@@ -119,8 +129,8 @@ const NamedDecl &findAnyDecl(ParsedAST &AST,
   return *Visitor.Decls.front();
 }
 
-const NamedDecl &findAnyDecl(ParsedAST &AST, llvm::StringRef Name) {
-  return findAnyDecl(AST, [Name](const NamedDecl &ND) {
+const NamedDecl &findUnqualifiedDecl(ParsedAST &AST, llvm::StringRef Name) {
+  return findDecl(AST, [Name](const NamedDecl &ND) {
     if (auto *ID = ND.getIdentifier())
       if (ID->getName() == Name)
         return true;

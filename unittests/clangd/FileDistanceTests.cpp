@@ -1,9 +1,8 @@
 //===-- FileDistanceTests.cpp  ------------------------*- C++ -*-----------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -93,6 +92,30 @@ TEST(FileDistance, LimitUpTraversals) {
   EXPECT_EQ(D.distance("/a/z"), 102u);
   EXPECT_EQ(D.distance("/a/b"), 1u);
   EXPECT_EQ(D.distance("/a/b/z"), 2u);
+}
+
+TEST(FileDistance, DisallowDownTraversalsFromRoot) {
+  FileDistanceOptions Opts;
+  Opts.UpCost = Opts.DownCost = 1;
+  Opts.AllowDownTraversalFromRoot = false;
+  SourceParams CostLots;
+  CostLots.Cost = 100;
+
+  FileDistance D({{"/", SourceParams()}, {"/a/b/c", CostLots}}, Opts);
+  EXPECT_EQ(D.distance("/"), 0u);
+  EXPECT_EQ(D.distance("/a"), 102u);
+  EXPECT_EQ(D.distance("/a/b"), 101u);
+  EXPECT_EQ(D.distance("/x"), FileDistance::Unreachable);
+}
+
+TEST(ScopeDistance, Smoke) {
+  ScopeDistance D({"x::y::z", "x::", "", "a::"});
+  EXPECT_EQ(D.distance("x::y::z::"), 0u);
+  EXPECT_GT(D.distance("x::y::"), D.distance("x::y::z::"));
+  EXPECT_GT(D.distance("x::"), D.distance("x::y::"));
+  EXPECT_GT(D.distance("x::y::z::down::"), D.distance("x::y::"));
+  EXPECT_GT(D.distance(""), D.distance("a::"));
+  EXPECT_GT(D.distance("x::"), D.distance("a::"));
 }
 
 } // namespace

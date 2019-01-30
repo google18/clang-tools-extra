@@ -1,9 +1,8 @@
 //===--- Trigram.cpp - Trigram generation for Fuzzy Matching ----*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -16,8 +15,6 @@
 #include <cctype>
 #include <queue>
 #include <string>
-
-using namespace llvm;
 
 namespace clang {
 namespace clangd {
@@ -49,7 +46,7 @@ std::vector<Token> generateIdentifierTrigrams(llvm::StringRef Identifier) {
     }
   }
 
-  DenseSet<Token> UniqueTrigrams;
+  llvm::DenseSet<Token> UniqueTrigrams;
 
   auto Add = [&](std::string Chars) {
     UniqueTrigrams.insert(Token(Token::Kind::Trigram, Chars));
@@ -97,7 +94,7 @@ std::vector<Token> generateQueryTrigrams(llvm::StringRef Query) {
   std::vector<CharRole> Roles(Query.size());
   calculateRoles(Query, llvm::makeMutableArrayRef(Roles.data(), Query.size()));
 
-  DenseSet<Token> UniqueTrigrams;
+  llvm::DenseSet<Token> UniqueTrigrams;
   std::string Chars;
   for (unsigned I = 0; I < Query.size(); ++I) {
     if (Roles[I] != Head && Roles[I] != Tail)

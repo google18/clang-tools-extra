@@ -1,9 +1,8 @@
 //===--- FileDistance.h - File proximity scoring -----------------*- C++-*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -48,14 +47,16 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/StringSaver.h"
+#include <memory>
 
 namespace clang {
 namespace clangd {
 
 struct FileDistanceOptions {
-  unsigned UpCost = 2;      // |foo/bar.h -> foo|
-  unsigned DownCost = 1;    // |foo -> foo/bar.h|
-  unsigned IncludeCost = 2; // |foo.cc -> included_header.h|
+  unsigned UpCost = 2;                    // |foo/bar.h -> foo|
+  unsigned DownCost = 1;                  // |foo -> foo/bar.h|
+  unsigned IncludeCost = 2;               // |foo.cc -> included_header.h|
+  bool AllowDownTraversalFromRoot = true; // | / -> /a |
 };
 
 struct SourceParams {
@@ -70,6 +71,7 @@ struct SourceParams {
 class FileDistance {
 public:
   static constexpr unsigned Unreachable = std::numeric_limits<unsigned>::max();
+  static const llvm::hash_code RootHash;
 
   FileDistance(llvm::StringMap<SourceParams> Sources,
                const FileDistanceOptions &Opts = {});
@@ -107,6 +109,19 @@ private:
   llvm::StringMap<SourceParams> Sources;
   llvm::StringMap<std::unique_ptr<FileDistance>> ByScheme;
   FileDistanceOptions Opts;
+};
+
+/// Support lookups like FileDistance, but the lookup keys are symbol scopes.
+/// For example, a scope "na::nb::" is converted to "/na/nb".
+class ScopeDistance {
+public:
+  /// QueryScopes[0] is the preferred scope.
+  ScopeDistance(llvm::ArrayRef<std::string> QueryScopes);
+
+  unsigned distance(llvm::StringRef SymbolScope);
+
+private:
+  FileDistance Distance;
 };
 
 } // namespace clangd

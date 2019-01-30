@@ -1,9 +1,8 @@
 //===-- CanonicalIncludes.h - remap #inclue headers--------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -53,10 +52,10 @@ CanonicalIncludes::mapHeader(llvm::ArrayRef<std::string> Headers,
   });
   if (I == Headers.end())
     return Headers[0]; // Fallback to the declaring header.
-  StringRef Header = *I;
+  llvm::StringRef Header = *I;
   // If Header is not expected be included (e.g. .cc file), we fall back to
   // the declaring header.
-  StringRef Ext = llvm::sys::path::extension(Header).trim('.');
+  llvm::StringRef Ext = llvm::sys::path::extension(Header).trim('.');
   // Include-able headers must have precompile type. Treat files with
   // non-recognized extenstions (TY_INVALID) as headers.
   auto ExtType = driver::types::lookupTypeForExtension(Ext);
@@ -87,7 +86,7 @@ collectIWYUHeaderMaps(CanonicalIncludes *Includes) {
     PragmaCommentHandler(CanonicalIncludes *Includes) : Includes(Includes) {}
 
     bool HandleComment(Preprocessor &PP, SourceRange Range) override {
-      StringRef Text =
+      llvm::StringRef Text =
           Lexer::getSourceText(CharSourceRange::getCharRange(Range),
                                PP.getSourceManager(), PP.getLangOpts());
       if (!Text.consume_front(IWYUPragma))
