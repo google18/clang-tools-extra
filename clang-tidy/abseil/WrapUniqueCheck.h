@@ -16,7 +16,9 @@ namespace clang {
 namespace tidy {
 namespace abseil {
 
-/// FIXME: Write a short description.
+/// Check for instances of factory functions, which use a non-public constructor,
+/// that returns a std::unique_ptr<T>. Then recommends using 
+/// absl::wrap_unique(new T(...))
 ///
 /// For the user-facing documentation see:
 /// http://clang.llvm.org/extra/clang-tidy/checks/abseil-wrap-unique.html
