@@ -1,6 +1,5 @@
 // RUN: %check_clang_tidy %s abseil-wrap-unique %t
 
-
 namespace std {
 
 template <typename T>
@@ -28,7 +27,6 @@ private:
   type *ptr;
 };
 }  // namespace std
-
 
 class A {
  public:
@@ -85,7 +83,5 @@ void positives() {
   //CHECK-FIXES: e = absl::WrapUnique(A::NewA())
 
   //std::unique_ptr<int> e(new int[2] {1,2});
-  
 }
-
 

@@ -1,0 +1,190 @@
+commit 99a9a97bbca3082dbe927a08d1140f9601ce87ee
+Author: Ryan Piantedosi <rypiante1@gmail.com>
+Date:   Tue Jan 29 19:07:02 2019 -0800
+
+    quick doc, and FIXME fix
+
+diff --git a/clang-tidy/abseil/WrapUniqueCheck.h b/clang-tidy/abseil/WrapUniqueCheck.h
+index 9642b5d9..658e54af 100644
+--- a/clang-tidy/abseil/WrapUniqueCheck.h
++++ b/clang-tidy/abseil/WrapUniqueCheck.h
+@@ -1,38 +1,40 @@
+ //===--- WrapUniqueCheck.h - clang-tidy -------------------------*- C++ -*-===//
+ //
+ //                     The LLVM Compiler Infrastructure
+ //
+ // This file is distributed under the University of Illinois Open Source
+ // License. See LICENSE.TXT for details.
+ //
+ //===----------------------------------------------------------------------===//
+ 
+ #ifndef LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_ABSEIL_WRAPUNIQUECHECK_H
+ #define LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_ABSEIL_WRAPUNIQUECHECK_H
+ 
+ #include "../ClangTidy.h"
+ 
+ namespace clang {
+ namespace tidy {
+ namespace abseil {
+ 
+-/// FIXME: Write a short description.
++/// Check for instances of factory functions, which use a non-public constructor,
++/// that returns a std::unique_ptr<T>. Then recommends using 
++/// absl::wrap_unique(new T(...))
+ ///
+ /// For the user-facing documentation see:
+ /// http://clang.llvm.org/extra/clang-tidy/checks/abseil-wrap-unique.html
+ class WrapUniqueCheck : public ClangTidyCheck {
+ private:
+   std::string getArgs(const SourceManager *SM, const CallExpr *MemExpr);
+ 
+ public:
+   WrapUniqueCheck(StringRef Name, ClangTidyContext *Context)
+       : ClangTidyCheck(Name, Context) {}
+   void registerMatchers(ast_matchers::MatchFinder *Finder) override;
+   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
+ };
+ 
+ } // namespace abseil
+ } // namespace tidy
+ } // namespace clang
+ 
+ #endif // LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_ABSEIL_WRAPUNIQUECHECK_H
+diff --git a/docs/ReleaseNotes.rst b/docs/ReleaseNotes.rst
+index 8cb0635a..e1b7830f 100644
+--- a/docs/ReleaseNotes.rst
++++ b/docs/ReleaseNotes.rst
+@@ -1,92 +1,91 @@
+ ===================================================
+ Extra Clang Tools 9.0.0 (In-Progress) Release Notes
+ ===================================================
+ 
+ .. contents::
+    :local:
+    :depth: 3
+ 
+ Written by the `LLVM Team <https://llvm.org/>`_
+ 
+ .. warning::
+ 
+    These are in-progress notes for the upcoming Extra Clang Tools 9 release.
+    Release notes for previous releases can be found on
+    `the Download Page <https://releases.llvm.org/download.html>`_.
+ 
+ Introduction
+ ============
+ 
+ This document contains the release notes for the Extra Clang Tools, part of the
+ Clang release 9.0.0. Here we describe the status of the Extra Clang Tools in
+ some detail, including major improvements from the previous release and new
+ feature work. All LLVM releases may be downloaded from the `LLVM releases web
+ site <https://llvm.org/releases/>`_.
+ 
+ For more information about Clang or LLVM, including information about
+ the latest release, please see the `Clang Web Site <https://clang.llvm.org>`_ or
+ the `LLVM Web Site <https://llvm.org>`_.
+ 
+ Note that if you are reading this file from a Subversion checkout or the
+ main Clang web page, this document applies to the *next* release, not
+ the current one. To see the release notes for a specific release, please
+ see the `releases page <https://llvm.org/releases/>`_.
+ 
+ What's New in Extra Clang Tools 9.0.0?
+ ======================================
+ 
+ Some of the major new features and improvements to Extra Clang Tools are listed
+ here. Generic improvements to Extra Clang Tools as a whole or to its underlying
+ infrastructure are described first, followed by tool-specific sections.
+ 
+ Major New Features
+ ------------------
+ 
+ ...
+ 
+ Improvements to clangd
+ ----------------------
+ 
+ The improvements are...
+ 
+ Improvements to clang-doc
+ -------------------------
+ 
+ The improvements are...
+ 
+ Improvements to clang-query
+ ---------------------------
+ 
+ - ...
+ 
+ Improvements to clang-rename
+ ----------------------------
+ 
+ The improvements are...
+ 
+ Improvements to clang-tidy
+ --------------------------
+ 
+-<<<<<<< HEAD
+ - New :doc:`abseil-wrap-unique
+   <clang-tidy/checks/abseil-wrap-unique>` check.
+ 
+   Looks for instances of factory functions which uses a non-public constructor
+-  that returns a std::unqiue_ptr<T> type then recommends using 
++  that returns a std::unqiue_ptr<T> then recommends using 
+   absl::wrap_unique(new T(...)).
+ 
+ - New :doc:`abseil-duration-conversion-cast
+   <clang-tidy/checks/abseil-duration-conversion-cast>` check.
+ 
+   Checks for casts of ``absl::Duration`` conversion functions, and recommends
+   the right conversion function instead.
+ 
+ Improvements to include-fixer
+ -----------------------------
+ 
+ The improvements are...
+ 
+ Improvements to modularize
+ --------------------------
+ 
+ The improvements are...
+diff --git a/docs/clang-tidy/checks/abseil-wrap-unique.rst b/docs/clang-tidy/checks/abseil-wrap-unique.rst
+index cf3e3de2..806d0c32 100644
+--- a/docs/clang-tidy/checks/abseil-wrap-unique.rst
++++ b/docs/clang-tidy/checks/abseil-wrap-unique.rst
+@@ -1,6 +1,34 @@
+ .. title:: clang-tidy - abseil-wrap-unique
+ 
+ abseil-wrap-unique
+ ==================
+ 
+-FIXME: Describe what patterns does the check detect and why. Give examples.
++Checks for instances of static function within a class being called and
++returning a std:unique_ptr<T> type. Also checks for instances where reset
++is called on a static function which returns std::unique_ptr<T>.
++
++.. code-block:: c++
++
++  class A {
++    public:
++      static A* NewA() {
++        return new A();
++      }
++
++    private:
++      A() {}
++  };
++ 
++  std::unique_ptr<A> a;
++ 
++  //Original - reset called with a static function returning a std::unqiue_ptr
++  a.reset(A::NewA());
++
++  //Suggested - reset ptr with absl::WrapUnique
++  a = absl::WrapUnique(A::NewA());
++
++  //Original - std::unique_ptr initialized with static function
++  std::unique_ptr<A> b(A::NewA());
++
++  //Suggested - initialize with absl::WrapUnique instead
++  auto b = absl::WrapUnique(A::NewA())

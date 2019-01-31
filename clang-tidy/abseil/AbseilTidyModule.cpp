@@ -58,7 +58,6 @@ public:
         "abseil-upgrade-duration-conversions");
     CheckFactories.registerCheck<WrapUniqueCheck>(
         "abseil-wrap-unique");
- 
  }
 };
 
