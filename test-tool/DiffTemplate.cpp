@@ -4,6 +4,7 @@
 #include "llvm/Support/CommandLine.h"
 #include <vector>
 #include <stack>
+#include <deque>
 
 using namespace llvm;
 using namespace clang;
@@ -123,6 +124,46 @@ void printInorder(const diff::SyntaxTree& Tree) {
   }
 }
 
+std::deque<diff::NodeId> findRootPath(const diff::SyntaxTree& Tree, 
+                                      const diff::NodeId& Id) {
+  std::deque<diff::NodeId> Deque;
+  diff::NodeId CurrId = Id;
+  Deque.push_front(CurrId);
+  while (CurrId != Tree.getRootId()) {
+    CurrId = Tree.getNode(CurrId).Parent;
+    Deque.push_front(CurrId);
+  }
+  return Deque;
+}
+
+diff::NodeId LCA(const diff::SyntaxTree& Tree, std::vector<diff::NodeId> Ids) {
+  std::vector<std::deque<diff::NodeId>> Paths;
+  llvm::outs() << "Calculating root to node paths...\n";
+  for (diff::NodeId Id : Ids) {
+    Paths.push_back(findRootPath(Tree, Id));
+  }
+
+  llvm::outs() << "Constraining loop index...\n";
+  size_t ShortestLength = Paths[0].size();
+  for (size_t i = 0; i < Paths.size(); i++) {
+    if (Paths[i].size() < ShortestLength) 
+      ShortestLength = Paths[i].size();
+  }
+
+  llvm::outs() << "Iterating through paths...\n";
+  size_t Idx;
+  for (Idx = 0; Idx < ShortestLength; Idx++) {
+    diff::NodeId CurrValue = Paths[0][Idx];
+    for (size_t i = 0; i < Paths.size(); i++) {
+      if (Paths[i][Idx] != CurrValue) {
+        return Paths[0][Idx-1];
+      }
+    }
+  }
+ 
+  return Paths[0][ShortestLength-1];
+}
+
 int main(int argc, const char **argv) {
   std::string ErrorMessage;
   std::unique_ptr<CompilationDatabase> CommonCompilations =
@@ -152,31 +193,40 @@ int main(int argc, const char **argv) {
   diff::SyntaxTree SrcTree(Src->getASTContext());
   diff::SyntaxTree DstTree(Dst->getASTContext());
   diff::ASTDiff Diff(SrcTree, DstTree, Options);
-
-  std::vector<NodeDiff> Diffs; 
+  
   printInorder(SrcTree);
   llvm::outs() << "\n";
-  printInorder(DstTree);
-  llvm::outs() << "\n";
   
+  std::vector<NodeDiff> Diffs; 
+  std::vector<diff::NodeId> DiffNodes;
   for (diff::NodeId Dst : DstTree) {
     const diff::Node &DstNode = DstTree.getNode(Dst);
     if (DstNode.Change != diff::None) {
       diff::NodeId Src = Diff.getMapped(DstTree, Dst);
       NodeDiff DstDiff = {DstNode.Change, Dst, Src};
       Diffs.push_back(DstDiff);
+      if (DstNode.Change != diff::Insert) {
+        DiffNodes.push_back(Src);
+      }
     }
   }
+
   for (diff::NodeId Src : SrcTree) {
     if (Diff.getMapped(SrcTree, Src).isInvalid()) {
       NodeDiff SrcDiff = {diff::Delete, Src, diff::NodeId(0)};
       Diffs.push_back(SrcDiff);
+      DiffNodes.push_back(Src);
     }
   }
-  
-  for (NodeDiff NDiff : Diffs) {
-    llvm::outs() << diffToString(NDiff) << "\n";
+
+  for (diff::NodeId Id : DiffNodes) {
+    llvm::outs() << Id.Id << ", ";
   }
+  llvm::outs() << "\n";
+
+  llvm::outs() << "Computing LCA...\n";
+  diff::NodeId Ancestor = LCA(SrcTree, DiffNodes);
+  llvm::outs() << Ancestor.Id << "\n"; 
 
   return 0;
 }
