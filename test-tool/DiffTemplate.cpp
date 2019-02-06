@@ -6,6 +6,8 @@
 #include <vector>
 #include <stack>
 #include <deque>
+#include <iostream>
+#include <fstream>
 
 using namespace llvm;
 using namespace clang;
@@ -124,6 +126,11 @@ void printMatcher(const diff::SyntaxTree& Tree,
   Builder += ")";
 }
 
+std::string narrowCallExpr(const diff::SyntaxTree& Tree, 
+                           const diff::NodeId& Id){
+  return "foobar";
+}
+
 void cleanUpCommas(std::string& String) {
   size_t Pos = std::string::npos;
   while ((Pos = String.find(", )")) != std::string::npos) {
@@ -144,10 +151,18 @@ std::deque<diff::NodeId> findRootPath(const diff::SyntaxTree& Tree,
 }
 
 diff::NodeId LCA(const diff::SyntaxTree& Tree, std::vector<diff::NodeId> Ids) {
-  std::vector<std::deque<diff::NodeId>> Paths;
+  std::vector<std::deque<diff::NodeId>> Paths; 
+
   llvm::outs() << "Calculating root to node paths...\n";
   for (diff::NodeId Id : Ids) {
     Paths.push_back(findRootPath(Tree, Id));
+  }
+
+  for (std::deque<diff::NodeId> Path : Paths) {
+    for (diff::NodeId NId : Path) {
+      llvm::outs() << NId.Id << ", ";
+    }
+    llvm::outs() << "\n";
   }
 
   // LCA is bounded by length of shortest path
@@ -210,6 +225,13 @@ std::vector<diff::NodeId> findSourceDiff(const diff::SyntaxTree& SrcTree,
   return DiffNodes;
 }
 
+//writes a string to cpp file
+void write2File(std::string in){
+  std::ofstream file("matcherDump.cpp");
+  file << in;
+  file.close();
+}
+
 int main(int argc, const char **argv) {
   std::string ErrorMessage;
   std::unique_ptr<CompilationDatabase> CommonCompilations =
@@ -263,5 +285,6 @@ int main(int argc, const char **argv) {
   printMatcher(SrcTree, DiffRoot, MatcherString);
   cleanUpCommas(MatcherString);
   llvm::outs() << MatcherString << "\n";
+  write2File(MatcherString);
   return 0;
 }
