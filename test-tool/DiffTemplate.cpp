@@ -1,3 +1,4 @@
+#include "clang/ASTMatchers/Dynamic/Registry.h"
 #include "clang/Tooling/ASTDiff/ASTDiff.h"
 #include "clang/Tooling/CommonOptionsParser.h"
 #include "clang/Tooling/Tooling.h"
@@ -75,35 +76,13 @@ getAST(const std::unique_ptr<CompilationDatabase> &CommonCompilations,
   return std::move(ASTs[0]);
 }
 
-struct NodeDiff {
-  diff::ChangeKind Change;
-  diff::NodeId Dst;
-  diff::NodeId Src;
-};
-
-std::string diffToString(NodeDiff Diff) {
-  std::string Str;
-  switch(Diff.Change) {
-  case diff::None:
-    Str = "None";
-    break;
-  case diff::Delete:
-    Str = "Delete " + std::to_string(Diff.Dst.Id);
-    break;
-  case diff::Update:
-    Str = "Update " + std::to_string(Diff.Src.Id) + " to " + std::to_string(Diff.Dst.Id);
-    break;
-  case diff::Insert:
-    Str = "Insert " + std::to_string(Diff.Dst.Id);
-    break;
-  case diff::Move:
-    Str = "Move " + std::to_string(Diff.Dst.Id);
-    break;
-  case diff::UpdateMove:
-    Str = "Update and Move " + std::to_string(Diff.Dst.Id);
-    break;
+std::string toMatcherName(llvm::StringRef TypeLabel) {
+  if (TypeLabel.startswith(StringRef("CXX"))) {
+    return "cxx" + TypeLabel.drop_front(3).str();
   }
-  return Str;
+  else {
+    return std::string(1, tolower(TypeLabel[0])) + TypeLabel.drop_front(1).str();
+  }
 }
 
 void printInorder(const diff::SyntaxTree& Tree) {
@@ -121,6 +100,34 @@ void printInorder(const diff::SyntaxTree& Tree) {
     for (diff::NodeId Child : CurrNode.Children) {
       Stack.push(Child);
     }
+  }
+}
+
+void printMatcher(const diff::SyntaxTree& Tree,
+                  const diff::NodeId& Id,
+                  std::string& Builder) {
+  const diff::Node CurrNode = Tree.getNode(Id);
+  Builder += toMatcherName(CurrNode.getTypeLabel());
+  Builder += "(";
+  ast_type_traits::DynTypedNode ASTNode = CurrNode.ASTNode;
+  const Expr* E = ASTNode.get<Expr>();
+  if (E) {
+    Builder += "hasType(cxxRecordDecl(hasName(\"";
+    Builder += E->getType().getAsString();
+    Builder += "\"))), ";
+  }
+  for (diff::NodeId Child : CurrNode.Children) {
+    Builder += "hasChild(";
+    printMatcher(Tree, Child, Builder);
+    Builder += "), ";
+  }
+  Builder += ")";
+}
+
+void cleanUpCommas(std::string& String) {
+  size_t Pos = std::string::npos;
+  while ((Pos = String.find(", )")) != std::string::npos) {
+    String.erase(Pos, 2);
   }
 }
 
@@ -143,7 +150,7 @@ diff::NodeId LCA(const diff::SyntaxTree& Tree, std::vector<diff::NodeId> Ids) {
     Paths.push_back(findRootPath(Tree, Id));
   }
 
-  llvm::outs() << "Constraining loop index...\n";
+  // LCA is bounded by length of shortest path
   size_t ShortestLength = Paths[0].size();
   for (size_t i = 0; i < Paths.size(); i++) {
     if (Paths[i].size() < ShortestLength) 
@@ -151,6 +158,8 @@ diff::NodeId LCA(const diff::SyntaxTree& Tree, std::vector<diff::NodeId> Ids) {
   }
 
   llvm::outs() << "Iterating through paths...\n";
+
+  // Iterate through paths until one differs
   size_t Idx;
   for (Idx = 0; Idx < ShortestLength; Idx++) {
     diff::NodeId CurrValue = Paths[0][Idx];
@@ -162,6 +171,43 @@ diff::NodeId LCA(const diff::SyntaxTree& Tree, std::vector<diff::NodeId> Ids) {
   }
  
   return Paths[0][ShortestLength-1];
+}
+
+diff::NodeId walkUpNode(const diff::SyntaxTree& Tree,
+                        const diff::NodeId Id) {
+  diff::NodeId CurrId = Id;
+  while (CurrId != Tree.getRootId()) {
+    diff::NodeId Parent = Tree.getNode(CurrId).Parent;
+    diff::Node ParentNode = Tree.getNode(Parent);
+    llvm::StringRef ParentType = ParentNode.getTypeLabel();
+    if (ParentType.equals(llvm::StringRef("DeclStmt")) || 
+        ParentType.equals(llvm::StringRef("CompoundStmt")) ||
+        ParentType.equals(llvm::StringRef("TranslationUnitDecl"))) {
+      return CurrId;
+    }
+    CurrId = Parent;
+  }
+  return CurrId;
+}
+
+std::vector<diff::NodeId> findSourceDiff(const diff::SyntaxTree& SrcTree,
+                                         const diff::SyntaxTree& DstTree,
+                                         const diff::ASTDiff& Diff) {
+  std::vector<diff::NodeId> DiffNodes;
+  for (diff::NodeId Dst : DstTree) {
+    const diff::Node &DstNode = DstTree.getNode(Dst);
+    if (DstNode.Change != diff::None && DstNode.Change != diff::Insert) {
+      diff::NodeId Src = Diff.getMapped(DstTree, Dst);
+      DiffNodes.push_back(Src);
+    }
+  }
+
+  for (diff::NodeId Src : SrcTree) {
+    if (Diff.getMapped(SrcTree, Src).isInvalid()) {
+      DiffNodes.push_back(Src);
+    }
+  }
+  return DiffNodes;
 }
 
 int main(int argc, const char **argv) {
@@ -194,31 +240,12 @@ int main(int argc, const char **argv) {
   diff::SyntaxTree DstTree(Dst->getASTContext());
   diff::ASTDiff Diff(SrcTree, DstTree, Options);
   
+  llvm::Optional<ast_matchers::dynamic::MatcherCtor> Ctor = ast_matchers::dynamic::Registry::lookupMatcherCtor(llvm::StringRef("cxxRecordDecl")); 
+  
   printInorder(SrcTree);
   llvm::outs() << "\n";
-  
-  std::vector<NodeDiff> Diffs; 
-  std::vector<diff::NodeId> DiffNodes;
-  for (diff::NodeId Dst : DstTree) {
-    const diff::Node &DstNode = DstTree.getNode(Dst);
-    if (DstNode.Change != diff::None) {
-      diff::NodeId Src = Diff.getMapped(DstTree, Dst);
-      NodeDiff DstDiff = {DstNode.Change, Dst, Src};
-      Diffs.push_back(DstDiff);
-      if (DstNode.Change != diff::Insert) {
-        DiffNodes.push_back(Src);
-      }
-    }
-  }
-
-  for (diff::NodeId Src : SrcTree) {
-    if (Diff.getMapped(SrcTree, Src).isInvalid()) {
-      NodeDiff SrcDiff = {diff::Delete, Src, diff::NodeId(0)};
-      Diffs.push_back(SrcDiff);
-      DiffNodes.push_back(Src);
-    }
-  }
-
+ 
+  std::vector<diff::NodeId> DiffNodes = findSourceDiff(SrcTree, DstTree, Diff);
   for (diff::NodeId Id : DiffNodes) {
     llvm::outs() << Id.Id << ", ";
   }
@@ -228,5 +255,13 @@ int main(int argc, const char **argv) {
   diff::NodeId Ancestor = LCA(SrcTree, DiffNodes);
   llvm::outs() << Ancestor.Id << "\n"; 
 
+  llvm::outs() << "Walking up parents...\n";
+  diff::NodeId DiffRoot = walkUpNode(SrcTree, Ancestor);
+  llvm::outs() << DiffRoot.Id << "\n";
+
+  std::string MatcherString;
+  printMatcher(SrcTree, DiffRoot, MatcherString);
+  cleanUpCommas(MatcherString);
+  llvm::outs() << MatcherString << "\n";
   return 0;
 }
