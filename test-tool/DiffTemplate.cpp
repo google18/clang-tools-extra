@@ -78,6 +78,9 @@ getAST(const std::unique_ptr<CompilationDatabase> &CommonCompilations,
   return std::move(ASTs[0]);
 }
 
+// Convert an ASTNode to a corresponding node matcher
+// Simplifies this by lowercasing the first character
+// TODO: ObjC matchers and other edge cases
 std::string toMatcherName(llvm::StringRef TypeLabel) {
   if (TypeLabel.startswith(StringRef("CXX"))) {
     return "cxx" + TypeLabel.drop_front(3).str();
@@ -87,6 +90,8 @@ std::string toMatcherName(llvm::StringRef TypeLabel) {
   }
 }
 
+// Print a SyntaxTree through in-order traversal
+// Useful for seeing what the tree looks like
 void printInorder(const diff::SyntaxTree& Tree) {
   std::stack<diff::NodeId> Stack;
   Stack.push(Tree.getRootId());
@@ -105,19 +110,40 @@ void printInorder(const diff::SyntaxTree& Tree) {
   }
 }
 
+// Given an Expr construct a matcher for the exact type
+std::string exprTypeMatcher(const Expr* E) {
+  std::string String;
+  String += "hasType(cxxRecordDecl(hasName(\"";
+  String += E->getType().getAsString();
+  String += "\"))), ";
+  return String;
+}
+
+// Recursively print the matcher for a Tree at the
+// given NodeId root
 void printMatcher(const diff::SyntaxTree& Tree,
                   const diff::NodeId& Id,
                   std::string& Builder) {
+
+  // Get the Node object
   const diff::Node CurrNode = Tree.getNode(Id);
+
+  // Simplest matcher for the node itself
   Builder += toMatcherName(CurrNode.getTypeLabel());
   Builder += "(";
+
+  // Get the ASTNode in the AST
   ast_type_traits::DynTypedNode ASTNode = CurrNode.ASTNode;
+
+  // Cast as Expr and try to match on it
   const Expr* E = ASTNode.get<Expr>();
   if (E) {
-    Builder += "hasType(cxxRecordDecl(hasName(\"";
-    Builder += E->getType().getAsString();
-    Builder += "\"))), ";
+    Builder += exprTypeMatcher(E);
   }
+
+  // TODO: ADD MORE NARROWING MATCHERS HERE
+
+  // Recurse through children
   for (diff::NodeId Child : CurrNode.Children) {
     Builder += "hasChild(";
     printMatcher(Tree, Child, Builder);
@@ -131,6 +157,8 @@ std::string narrowCallExpr(const diff::SyntaxTree& Tree,
   return "foobar";
 }
 
+// Removes malformed comma patterns in the resulting matcher
+// string
 void cleanUpCommas(std::string& String) {
   size_t Pos = std::string::npos;
   while ((Pos = String.find(", )")) != std::string::npos) {
@@ -138,6 +166,7 @@ void cleanUpCommas(std::string& String) {
   }
 }
 
+// Find root-to-node path for lowest common ancestor
 std::deque<diff::NodeId> findRootPath(const diff::SyntaxTree& Tree, 
                                       const diff::NodeId& Id) {
   std::deque<diff::NodeId> Deque;
@@ -150,6 +179,7 @@ std::deque<diff::NodeId> findRootPath(const diff::SyntaxTree& Tree,
   return Deque;
 }
 
+// Lowest common ancestor for multiple nodes in AST
 diff::NodeId LCA(const diff::SyntaxTree& Tree, std::vector<diff::NodeId> Ids) {
   std::vector<std::deque<diff::NodeId>> Paths; 
 
@@ -188,6 +218,8 @@ diff::NodeId LCA(const diff::SyntaxTree& Tree, std::vector<diff::NodeId> Ids) {
   return Paths[0][ShortestLength-1];
 }
 
+// Find highest but most specific ancestor of given node
+// This is where we bind the root of our matcher
 diff::NodeId walkUpNode(const diff::SyntaxTree& Tree,
                         const diff::NodeId Id) {
   diff::NodeId CurrId = Id;
@@ -205,6 +237,8 @@ diff::NodeId walkUpNode(const diff::SyntaxTree& Tree,
   return CurrId;
 }
 
+// Utility for computing a list of diffs with respect to the 
+// source SyntaxTree
 std::vector<diff::NodeId> findSourceDiff(const diff::SyntaxTree& SrcTree,
                                          const diff::SyntaxTree& DstTree,
                                          const diff::ASTDiff& Diff) {
@@ -260,9 +294,7 @@ int main(int argc, const char **argv) {
 
   diff::SyntaxTree SrcTree(Src->getASTContext());
   diff::SyntaxTree DstTree(Dst->getASTContext());
-  diff::ASTDiff Diff(SrcTree, DstTree, Options);
-  
-  llvm::Optional<ast_matchers::dynamic::MatcherCtor> Ctor = ast_matchers::dynamic::Registry::lookupMatcherCtor(llvm::StringRef("cxxRecordDecl")); 
+  diff::ASTDiff Diff(SrcTree, DstTree, Options); 
   
   printInorder(SrcTree);
   llvm::outs() << "\n";
