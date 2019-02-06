@@ -103,6 +103,14 @@ void printInorder(const diff::SyntaxTree& Tree) {
   }
 }
 
+std::string exprTypeMatcher(const Expr* E) {
+  std::string String;
+  String += "hasType(cxxRecordDecl(hasName(\"";
+  String += E->getType().getAsString();
+  String += "\"))), ";
+  return String;
+}
+
 void printMatcher(const diff::SyntaxTree& Tree,
                   const diff::NodeId& Id,
                   std::string& Builder) {
@@ -112,9 +120,7 @@ void printMatcher(const diff::SyntaxTree& Tree,
   ast_type_traits::DynTypedNode ASTNode = CurrNode.ASTNode;
   const Expr* E = ASTNode.get<Expr>();
   if (E) {
-    Builder += "hasType(cxxRecordDecl(hasName(\"";
-    Builder += E->getType().getAsString();
-    Builder += "\"))), ";
+    Builder += exprTypeMatcher(E);
   }
   for (diff::NodeId Child : CurrNode.Children) {
     Builder += "hasChild(";
