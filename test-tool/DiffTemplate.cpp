@@ -6,6 +6,7 @@
 #include <vector>
 #include <stack>
 #include <deque>
+#include <unordered_set>
 
 using namespace llvm;
 using namespace clang;
@@ -108,12 +109,48 @@ void printInorder(const diff::SyntaxTree& Tree) {
   }
 }
 
-// Given an Expr construct a matcher for the exact type
-std::string exprTypeMatcher(const Expr* E) {
+std::string exprMatcher(const Expr* E) {
   std::string String;
-  String += "hasType(cxxRecordDecl(hasName(\"";
-  String += E->getType().getAsString();
-  String += "\"))), ";
+  const clang::Type* TypePtr = E->getType().getTypePtr();
+  if (TypePtr) {
+    CXXRecordDecl* R = TypePtr->getAsCXXRecordDecl();
+    if (R) {
+      String += "hasType(cxxRecordDecl(hasName(\"";
+      String += R->getNameAsString();
+      String += "\"))), ";
+    }
+  }
+  if (E->isInstantiationDependent()) {
+    String += "isInstantiationDependent()";
+  }
+  if (E->isTypeDependent()) {
+    String += "isTypeDependent()";
+  }
+  if (E->isValueDependent()) {
+    String += "isValueDependent()";
+  }
+  return String;
+}
+
+std::string nameMatcher(const NamedDecl* D) {
+  std::string String;
+  String += "hasName(\"";
+  String += D->getNameAsString();
+  String += "\"), ";
+  return String;
+}
+
+std::string constructExprMatcher(const CXXConstructExpr* E) {
+  std::string String;
+  String += "argumentCountIs(";
+  String += std::to_string(E->getNumArgs());
+  String += "), ";
+  if (E->isListInitialization()) {
+    String += "isListInitialization(), ";
+  }
+  if (E->requiresZeroInitialization()) {
+    String += "requiresZeroInitialization(), ";
+  }
   return String;
 }
 
@@ -133,17 +170,26 @@ void printMatcher(const diff::SyntaxTree& Tree,
   // Get the ASTNode in the AST
   ast_type_traits::DynTypedNode ASTNode = CurrNode.ASTNode;
 
-  // Cast as Expr and try to match on it
   const Expr* E = ASTNode.get<Expr>();
   if (E) {
-    Builder += exprTypeMatcher(E);
+    Builder += exprMatcher(E);
   }
 
   // TODO: ADD MORE NARROWING MATCHERS HERE
 
+  const NamedDecl* D = ASTNode.get<NamedDecl>();
+  if (D) {
+    Builder += nameMatcher(D);
+  }
+
+  const CXXConstructExpr* C = ASTNode.get<CXXConstructExpr>();
+  if (C) {
+    Builder += constructExprMatcher(C);
+  }
+
   // Recurse through children
   for (diff::NodeId Child : CurrNode.Children) {
-    Builder += "hasChild(";
+    Builder += "has(";
     printMatcher(Tree, Child, Builder);
     Builder += "), ";
   }
@@ -157,6 +203,14 @@ void cleanUpCommas(std::string& String) {
   while ((Pos = String.find(", )")) != std::string::npos) {
     String.erase(Pos, 2);
   }
+}
+
+namespace std {
+  template<> struct hash<diff::NodeId> {
+    std::size_t operator()(const diff::NodeId& p) const noexcept {
+      return std::hash<int>()(p.Id);
+    }
+  };
 }
 
 // Find root-to-node path for lowest common ancestor
@@ -173,11 +227,24 @@ std::deque<diff::NodeId> findRootPath(const diff::SyntaxTree& Tree,
 }
 
 // Lowest common ancestor for multiple nodes in AST
-diff::NodeId LCA(const diff::SyntaxTree& Tree, std::vector<diff::NodeId> Ids) {
+std::unordered_set<diff::NodeId> LCA(const diff::SyntaxTree& Tree, 
+                                     std::vector<diff::NodeId> Ids) {
+  if (Ids.empty()) {
+    llvm::outs() << "No AST difference found!\n";
+    std::unordered_set<diff::NodeId> Empty;
+    return Empty;
+  }
   std::vector<std::deque<diff::NodeId>> Paths;
   llvm::outs() << "Calculating root to node paths...\n";
   for (diff::NodeId Id : Ids) {
     Paths.push_back(findRootPath(Tree, Id));
+  }
+  
+  for (std::deque<diff::NodeId> Path : Paths) {
+    for (diff::NodeId Id : Path) {
+      llvm::outs() << Id.Id << ", ";
+    }
+    llvm::outs() << "\n";
   }
 
   // LCA is bounded by length of shortest path
@@ -193,14 +260,20 @@ diff::NodeId LCA(const diff::SyntaxTree& Tree, std::vector<diff::NodeId> Ids) {
   size_t Idx;
   for (Idx = 0; Idx < ShortestLength; Idx++) {
     diff::NodeId CurrValue = Paths[0][Idx];
-    for (size_t i = 0; i < Paths.size(); i++) {
-      if (Paths[i][Idx] != CurrValue) {
-        return Paths[0][Idx-1];
-      }
+    for (std::deque<diff::NodeId> Path : Paths) {
+      if (Path[Idx] != CurrValue) {
+        std::unordered_set<diff::NodeId> DiffNodes;
+        for (std::deque<diff::NodeId> P : Paths) {
+          DiffNodes.insert(P[Idx]);
+        }
+        return DiffNodes;
+      } 
     }
   }
  
-  return Paths[0][ShortestLength-1];
+  std::unordered_set<diff::NodeId> Singleton;
+  Singleton.insert(Paths[0][ShortestLength-1]);
+  return Singleton;
 }
 
 // Find highest but most specific ancestor of given node
@@ -284,16 +357,18 @@ int main(int argc, const char **argv) {
   llvm::outs() << "\n";
 
   llvm::outs() << "Computing LCA...\n";
-  diff::NodeId Ancestor = LCA(SrcTree, DiffNodes);
-  llvm::outs() << Ancestor.Id << "\n"; 
+  std::unordered_set<diff::NodeId> Ancestors = LCA(SrcTree, DiffNodes);
+  if (!Ancestors.empty()) {
+    for (diff::NodeId Ancestor : Ancestors) {
+      llvm::outs() << Ancestor.Id << "\n"; 
+    }
 
-  llvm::outs() << "Walking up parents...\n";
-  diff::NodeId DiffRoot = walkUpNode(SrcTree, Ancestor);
-  llvm::outs() << DiffRoot.Id << "\n";
-
-  std::string MatcherString;
-  printMatcher(SrcTree, DiffRoot, MatcherString);
-  cleanUpCommas(MatcherString);
-  llvm::outs() << MatcherString << "\n";
+    for (diff::NodeId DiffRoot : Ancestors) {
+      std::string MatcherString;
+      printMatcher(SrcTree, DiffRoot, MatcherString);
+      cleanUpCommas(MatcherString);
+      llvm::outs() << MatcherString << "\n";
+    }
+  } 
   return 0;
 }
