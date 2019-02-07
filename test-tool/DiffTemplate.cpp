@@ -119,6 +119,38 @@ std::string exprTypeMatcher(const Expr* E) {
   return String;
 }
 
+// Creates matcher code for the arguments of a callExpr.
+std::string callExprArgs(const CallExpr* CE){ 
+  std::string MatchCode;
+
+  //Args
+  std::vector<const clang::Expr*> ArgVector; 
+  CallExpr::const_arg_range Args = CE->arguments();
+  if(Args.begin() != Args.end()){
+    int i = 0;
+    for(const clang::Expr* Arg : Args ){
+      ArgVector.push_back(Arg);
+      MatchCode += "callExpr(hasArgument(" + std::to_string(i) + ",";
+      //MatchCode += Arg->getType().getAsString();
+      MatchCode += "declRefExpr()))";
+      ++i;
+    }
+  }
+  return MatchCode;
+}
+//Creates matcher code for the callee of a call expr.
+std::string callExprCallee(const CallExpr* CE){
+  std::string MatchCode;
+  const clang::FunctionDecl* dirCallee = CE->getDirectCallee();
+  if(dirCallee){
+    MatchCode += "callExpr(callee(";
+    //might need to generalize
+    MatchCode += "cxxMethodDecl(hasName(\"";
+    MatchCode += dirCallee->getNameAsString()  + "\"))))";
+  }
+  return MatchCode;
+}
+
 // Recursively print the matcher for a Tree at the
 // given NodeId root
 void printMatcher(const diff::SyntaxTree& Tree,
@@ -142,7 +174,11 @@ void printMatcher(const diff::SyntaxTree& Tree,
   }
 
   // TODO: ADD MORE NARROWING MATCHERS HERE
-
+  const CallExpr* C = ASTNode.get<CallExpr>();
+  if(C){
+    Builder += callExprCallee(C);
+    Builder += callExprArgs(C);
+  }
   // Recurse through children
   for (diff::NodeId Child : CurrNode.Children) {
     Builder += "hasChild(";
@@ -150,11 +186,6 @@ void printMatcher(const diff::SyntaxTree& Tree,
     Builder += "), ";
   }
   Builder += ")";
-}
-
-std::string narrowCallExpr(const diff::SyntaxTree& Tree, 
-                           const diff::NodeId& Id){
-  return "foobar";
 }
 
 // Removes malformed comma patterns in the resulting matcher
@@ -264,6 +295,8 @@ void write2File(std::string in){
   std::ofstream file("matcherDump.cpp");
   file << in;
   file.close();
+  //TODO Line wont work on non clinic machines
+  system("/Users/clinic18/Desktop/llvm/build/bin/clang-format -i matcherDump.cpp");
 }
 
 int main(int argc, const char **argv) {
