@@ -122,17 +122,15 @@ std::string exprTypeMatcher(const Expr* E) {
 // Creates matcher code for the arguments of a callExpr.
 std::string callExprArgs(const CallExpr* CE){ 
   std::string MatchCode;
-
-  //Args
   std::vector<const clang::Expr*> ArgVector; 
   CallExpr::const_arg_range Args = CE->arguments();
   if(Args.begin() != Args.end()){
     int i = 0;
     for(const clang::Expr* Arg : Args ){
       ArgVector.push_back(Arg);
-      MatchCode += "callExpr(hasArgument(" + std::to_string(i) + ",";
+      MatchCode += "hasArgument(" + std::to_string(i) + ",";
       //MatchCode += Arg->getType().getAsString();
-      MatchCode += "declRefExpr()))";
+      MatchCode += "declRefExpr())";
       ++i;
     }
   }
@@ -143,10 +141,10 @@ std::string callExprCallee(const CallExpr* CE){
   std::string MatchCode;
   const clang::FunctionDecl* dirCallee = CE->getDirectCallee();
   if(dirCallee){
-    MatchCode += "callExpr(callee(";
+    MatchCode += "callee(";
     //might need to generalize
-    MatchCode += "cxxMethodDecl(hasName(\"";
-    MatchCode += dirCallee->getNameAsString()  + "\"))))";
+    MatchCode += "functionDecl(hasName(\"";
+    MatchCode += dirCallee->getNameAsString()  + "\")))";
   }
   return MatchCode;
 }
