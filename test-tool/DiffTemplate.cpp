@@ -185,36 +185,6 @@ std::string constructExprMatcher(const CXXConstructExpr* E) {
   return String;
 }
 
-// Creates matcher code for the arguments of a callExpr.
-std::string callExprArgs(const CallExpr* CE){ 
-  std::string MatchCode;
-  std::vector<const clang::Expr*> ArgVector; 
-  CallExpr::const_arg_range Args = CE->arguments();
-  if(Args.begin() != Args.end()){
-    int i = 0;
-    for(const clang::Expr* Arg : Args ){
-      ArgVector.push_back(Arg);
-      MatchCode += "hasArgument(" + std::to_string(i) + ",";
-      //MatchCode += Arg->getType().getAsString();
-      MatchCode += "declRefExpr())";
-      ++i;
-    }
-  }
-  return MatchCode;
-}
-//Creates matcher code for the callee of a call expr.
-std::string callExprCallee(const CallExpr* CE){
-  std::string MatchCode;
-  const clang::FunctionDecl* dirCallee = CE->getDirectCallee();
-  if(dirCallee){
-    MatchCode += "callee(";
-    //might need to generalize
-    MatchCode += "functionDecl(hasName(\"";
-    MatchCode += dirCallee->getNameAsString()  + "\")))";
-  }
-  return MatchCode;
-}
-
 // Recursively print the matcher for a Tree at the
 // given NodeId root
 void printMatcher(const diff::SyntaxTree& Tree,
@@ -237,6 +207,7 @@ void printMatcher(const diff::SyntaxTree& Tree,
   }*/
 
   // TODO: ADD MORE NARROWING MATCHERS HERE
+
   const NamedDecl* D = ASTNode.get<NamedDecl>();
   if (D) {
     Builder += nameMatcher(D);
@@ -313,13 +284,6 @@ std::unordered_set<diff::NodeId> LCA(const diff::SyntaxTree& Tree,
     llvm::outs() << "\n";
   }
 
-  for (std::deque<diff::NodeId> Path : Paths) {
-    for (diff::NodeId NId : Path) {
-      llvm::outs() << NId.Id << ", ";
-    }
-    llvm::outs() << "\n";
-  }
-
   // LCA is bounded by length of shortest path
   size_t ShortestLength = Paths[0].size();
   for (size_t i = 0; i < Paths.size(); i++) {
@@ -388,15 +352,6 @@ std::vector<diff::NodeId> findSourceDiff(const diff::SyntaxTree& SrcTree,
     }
   }
   return DiffNodes;
-}
-
-//writes a string to cpp file
-void write2File(std::string in){
-  std::ofstream file("matcherDump.cpp");
-  file << in;
-  file.close();
-  //TODO Line wont work on non clinic machines
-  system("/Users/clinic18/Desktop/llvm/build/bin/clang-format -i matcherDump.cpp");
 }
 
 int main(int argc, const char **argv) {
