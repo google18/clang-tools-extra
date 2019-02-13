@@ -326,7 +326,7 @@ int main(int argc, const char **argv) {
   diff::SyntaxTree SrcTree(Src->getASTContext());
   diff::SyntaxTree DstTree(Dst->getASTContext());
   diff::ASTDiff Diff(SrcTree, DstTree, Options); 
-
+  
   printInorder(SrcTree);
   llvm::outs() << "\n";
  
