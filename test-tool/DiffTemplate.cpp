@@ -89,24 +89,25 @@ std::string toMatcherName(llvm::StringRef TypeLabel) {
   }
 }
 
-// Print a SyntaxTree through in-order traversal
-// Useful for seeing what the tree looks like
-void printInorder(const diff::SyntaxTree& Tree) {
-  std::stack<diff::NodeId> Stack;
-  Stack.push(Tree.getRootId());
-  while (!Stack.empty()) {
-    const diff::NodeId CurrId = Stack.top();
-    Stack.pop();
-    const diff::Node CurrNode = Tree.getNode(CurrId);
-    llvm::outs() << CurrNode.getTypeLabel();
-    std::string Value = Tree.getNodeValue(CurrId);
-    if (!Value.empty())
-      llvm::outs() << ": " << Value;
-    llvm::outs() << " (" << CurrId << ")\n";
-    for (diff::NodeId Child : CurrNode.Children) {
-      Stack.push(Child);
-    }
+void printTreeRecursive(const diff::SyntaxTree& Tree, 
+                        const diff::NodeId CurrId,
+                        size_t Level) {
+  for (size_t i = 0; i < Level; i++) {
+    llvm::outs() << "-";
   }
+  const diff::Node CurrNode = Tree.getNode(CurrId);
+  llvm::outs() << CurrNode.getTypeLabel();
+  std::string Value = Tree.getNodeValue(CurrId);
+  if (!Value.empty())
+    llvm::outs() << ": " << Value;
+  llvm::outs() << " (" << CurrId << ")\n";
+  for (diff::NodeId Child : CurrNode.Children) {
+    printTreeRecursive(Tree, Child, Level + 1);
+  }
+}
+
+void printTree(const diff::SyntaxTree& Tree) {
+  printTreeRecursive(Tree, Tree.getRootId(), 0);
 }
 
 std::string exprMatcher(const Expr* E) {
@@ -121,15 +122,45 @@ std::string exprMatcher(const Expr* E) {
     }
   }
   if (E->isInstantiationDependent()) {
-    String += "isInstantiationDependent()";
+    String += "isInstantiationDependent(), ";
   }
   if (E->isTypeDependent()) {
-    String += "isTypeDependent()";
+    String += "isTypeDependent(), ";
   }
   if (E->isValueDependent()) {
-    String += "isValueDependent()";
+    String += "isValueDependent(), ";
   }
   return String;
+}
+
+// Creates matcher code for the arguments of a callExpr.
+std::string callExprArgs(const CallExpr* CE){ 
+  std::string MatchCode;
+  std::vector<const clang::Expr*> ArgVector; 
+  CallExpr::const_arg_range Args = CE->arguments();
+  if(Args.begin() != Args.end()){
+    int i = 0;
+    for(const clang::Expr* Arg : Args ){
+      ArgVector.push_back(Arg);
+      MatchCode += "hasArgument(" + std::to_string(i) + ", ";
+      MatchCode += "declRefExpr()), "; // TODO: recurse here?
+      ++i;
+    }
+  }
+  return MatchCode;
+}
+
+// Creates matcher code for the callee of a call expr.
+std::string callExprCallee(const CallExpr* CE){
+  std::string MatchCode;
+  const clang::FunctionDecl* dirCallee = CE->getDirectCallee();
+  if(dirCallee){
+    MatchCode += "callee(";
+    //might need to generalize
+    MatchCode += "functionDecl(hasName(\"";
+    MatchCode += dirCallee->getNameAsString()  + "\"))), ";
+  }
+  return MatchCode;
 }
 
 std::string nameMatcher(const NamedDecl* D) {
@@ -170,10 +201,10 @@ void printMatcher(const diff::SyntaxTree& Tree,
   // Get the ASTNode in the AST
   ast_type_traits::DynTypedNode ASTNode = CurrNode.ASTNode;
 
-  const Expr* E = ASTNode.get<Expr>();
+  /*const Expr* E = ASTNode.get<Expr>();
   if (E) {
     Builder += exprMatcher(E);
-  }
+  }*/
 
   // TODO: ADD MORE NARROWING MATCHERS HERE
 
@@ -186,6 +217,12 @@ void printMatcher(const diff::SyntaxTree& Tree,
   if (C) {
     Builder += constructExprMatcher(C);
   }
+
+  const CallExpr* CE = ASTNode.get<CallExpr>();
+  /*if (CE) {
+    Builder += callExprCallee(CE);
+    Builder += callExprArgs(CE);
+  }*/
 
   // Recurse through children
   for (diff::NodeId Child : CurrNode.Children) {
@@ -347,7 +384,7 @@ int main(int argc, const char **argv) {
   diff::SyntaxTree DstTree(Dst->getASTContext());
   diff::ASTDiff Diff(SrcTree, DstTree, Options); 
   
-  printInorder(SrcTree);
+  printTree(SrcTree);
   llvm::outs() << "\n";
  
   std::vector<diff::NodeId> DiffNodes = findSourceDiff(SrcTree, DstTree, Diff);
