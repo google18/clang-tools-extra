@@ -173,7 +173,15 @@ std::string nameMatcher(const NamedDecl *D) {
   return String;
 }
 
-std::string constructExprMatcher(const CXXConstructExpr *E) {
+std::string parmMatcher(const ParmVarDecl* P) {
+  std::string String;
+  if (P -> hasDefaultArg()) {
+    String += "hasDefaultArgument(), ";
+  }
+  return String;
+}
+
+std::string constructExprMatcher(const CXXConstructExpr* E) {
   std::string String;
   String += "argumentCountIs(";
   String += std::to_string(E->getNumArgs());
@@ -195,21 +203,27 @@ void printMatcher(const diff::SyntaxTree &Tree, const diff::NodeId &Id,
   // Get the Node object
   const diff::Node CurrNode = Tree.getNode(Id);
 
+  // Get the ASTNode in the AST
+  ast_type_traits::DynTypedNode ASTNode = CurrNode.ASTNode;
+  
   // Simplest matcher for the node itself
   Builder += toMatcherName(CurrNode.getTypeLabel());
   Builder += "(";
 
-  // Get the ASTNode in the AST
-  ast_type_traits::DynTypedNode ASTNode = CurrNode.ASTNode;
-
-  /*const Expr* E = ASTNode.get<Expr>();
+  const Expr* E = ASTNode.get<Expr>();
   if (E) {
     Builder += exprMatcher(E);
-  }*/
+  }
 
   // TODO: ADD MORE NARROWING MATCHERS HERE
 
-  const NamedDecl *D = ASTNode.get<NamedDecl>();
+  const ParmVarDecl* P = ASTNode.get<ParmVarDecl>();
+  if (P) {
+    Builder += parmMatcher(P);
+  }
+
+  const NamedDecl* D = ASTNode.get<NamedDecl>();
+
   if (D) {
     Builder += nameMatcher(D);
   }
@@ -219,11 +233,12 @@ void printMatcher(const diff::SyntaxTree &Tree, const diff::NodeId &Id,
     Builder += constructExprMatcher(C);
   }
 
-  const CallExpr *CE = ASTNode.get<CallExpr>();
-  /*if (CE) {
+
+  const CallExpr* CE = ASTNode.get<CallExpr>();
+  if (CE) {
     Builder += callExprCallee(CE);
     Builder += callExprArgs(CE);
-  }*/
+  }
 
   // Recurse through children
   for (diff::NodeId Child : CurrNode.Children) {
@@ -231,6 +246,7 @@ void printMatcher(const diff::SyntaxTree &Tree, const diff::NodeId &Id,
     printMatcher(Tree, Child, Builder);
     Builder += "), ";
   }
+
   Builder += ")";
 }
 
@@ -242,14 +258,6 @@ void cleanUpCommas(std::string &String) {
     String.erase(Pos, 2);
   }
 }
-
-namespace std {
-template <> struct hash<diff::NodeId> {
-  std::size_t operator()(const diff::NodeId &p) const noexcept {
-    return std::hash<int>()(p.Id);
-  }
-};
-} // namespace std
 
 // Find root-to-node path for lowest common ancestor
 std::deque<diff::NodeId> findRootPath(const diff::SyntaxTree &Tree,
@@ -265,13 +273,13 @@ std::deque<diff::NodeId> findRootPath(const diff::SyntaxTree &Tree,
 }
 
 // Lowest common ancestor for multiple nodes in AST
-std::unordered_set<diff::NodeId> LCA(const diff::SyntaxTree &Tree,
+diff::NodeId LCA(const diff::SyntaxTree& Tree, 
                                      std::vector<diff::NodeId> Ids) {
   if (Ids.empty()) {
     llvm::outs() << "No AST difference found!\n";
-    std::unordered_set<diff::NodeId> Empty;
-    return Empty;
+    return diff::NodeId(-1);
   }
+
   std::vector<std::deque<diff::NodeId>> Paths;
   llvm::outs() << "Calculating root to node paths...\n";
   for (diff::NodeId Id : Ids) {
@@ -300,18 +308,12 @@ std::unordered_set<diff::NodeId> LCA(const diff::SyntaxTree &Tree,
     diff::NodeId CurrValue = Paths[0][Idx];
     for (std::deque<diff::NodeId> Path : Paths) {
       if (Path[Idx] != CurrValue) {
-        std::unordered_set<diff::NodeId> DiffNodes;
-        for (std::deque<diff::NodeId> P : Paths) {
-          DiffNodes.insert(P[Idx]);
-        }
-        return DiffNodes;
-      }
+        return Path[Idx-1];
+      } 
     }
   }
-
-  std::unordered_set<diff::NodeId> Singleton;
-  Singleton.insert(Paths[0][ShortestLength - 1]);
-  return Singleton;
+ 
+  return Paths[0][ShortestLength-1];
 }
 
 // Find highest but most specific ancestor of given node
@@ -340,12 +342,22 @@ std::vector<diff::NodeId> findSourceDiff(const diff::SyntaxTree &SrcTree,
   std::vector<diff::NodeId> DiffNodes;
   for (diff::NodeId Dst : DstTree) {
     const diff::Node &DstNode = DstTree.getNode(Dst);
+    // Cover updates and update-moves
     if (DstNode.Change != diff::None && DstNode.Change != diff::Insert) {
       diff::NodeId Src = Diff.getMapped(DstTree, Dst);
       DiffNodes.push_back(Src);
     }
+    // If insert, then the parent of insert is a diff in the source tree
+    else if (DstNode.Change == diff::Insert) {
+      diff::NodeId Src = Diff.getMapped(DstTree, DstNode.Parent);
+      if (Src.isValid()) {
+        DiffNodes.push_back(Src);
+      }
+    }
   }
 
+  // Cover deletes
+  // TODO: where to do moves?
   for (diff::NodeId Src : SrcTree) {
     if (Diff.getMapped(SrcTree, Src).isInvalid()) {
       DiffNodes.push_back(Src);
@@ -401,19 +413,14 @@ int main(int argc, const char **argv) {
   llvm::outs() << "\n";
 
   llvm::outs() << "Computing LCA...\n";
-  std::unordered_set<diff::NodeId> Ancestors = LCA(SrcTree, DiffNodes);
-  if (!Ancestors.empty()) {
-    for (diff::NodeId Ancestor : Ancestors) {
-      llvm::outs() << Ancestor.Id << "\n";
-    }
+  diff::NodeId Ancestor = LCA(SrcTree, DiffNodes);
+  if (Ancestor.Id != -1) {
+    llvm::outs() << Ancestor.Id << "\n";
 
-    for (diff::NodeId DiffRoot : Ancestors) {
-      std::string MatcherString;
-      printMatcher(SrcTree, DiffRoot, MatcherString);
-      cleanUpCommas(MatcherString);
-      llvm::outs() << MatcherString << "\n";
-      writeToFile(MatcherString);
-    }
-  }
+    std::string MatcherString;
+    printMatcher(SrcTree, Ancestor, MatcherString);
+    cleanUpCommas(MatcherString);
+    llvm::outs() << MatcherString << "\n";
+  } 
   return 0;
 }
