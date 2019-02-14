@@ -171,6 +171,14 @@ std::string nameMatcher(const NamedDecl* D) {
   return String;
 }
 
+std::string parmMatcher(const ParmVarDecl* P) {
+  std::string String;
+  if (P -> hasDefaultArg()) {
+    String += "hasDefaultArgument(), ";
+  }
+  return String;
+}
+
 std::string constructExprMatcher(const CXXConstructExpr* E) {
   std::string String;
   String += "argumentCountIs(";
@@ -207,6 +215,11 @@ void printMatcher(const diff::SyntaxTree& Tree,
   }*/
 
   // TODO: ADD MORE NARROWING MATCHERS HERE
+
+  const ParmVarDecl* P = ASTNode.get<ParmVarDecl>();
+  if (P) {
+    Builder += parmMatcher(P);
+  }
 
   const NamedDecl* D = ASTNode.get<NamedDecl>();
   if (D) {
