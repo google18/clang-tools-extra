@@ -194,12 +194,12 @@ void printMatcher(const diff::SyntaxTree& Tree,
   // Get the Node object
   const diff::Node CurrNode = Tree.getNode(Id);
 
+  // Get the ASTNode in the AST
+  ast_type_traits::DynTypedNode ASTNode = CurrNode.ASTNode;
+  
   // Simplest matcher for the node itself
   Builder += toMatcherName(CurrNode.getTypeLabel());
   Builder += "(";
-
-  // Get the ASTNode in the AST
-  ast_type_traits::DynTypedNode ASTNode = CurrNode.ASTNode;
 
   /*const Expr* E = ASTNode.get<Expr>();
   if (E) {
@@ -219,10 +219,10 @@ void printMatcher(const diff::SyntaxTree& Tree,
   }
 
   const CallExpr* CE = ASTNode.get<CallExpr>();
-  /*if (CE) {
+  if (CE) {
     Builder += callExprCallee(CE);
     Builder += callExprArgs(CE);
-  }*/
+  }
 
   // Recurse through children
   for (diff::NodeId Child : CurrNode.Children) {
@@ -230,6 +230,7 @@ void printMatcher(const diff::SyntaxTree& Tree,
     printMatcher(Tree, Child, Builder);
     Builder += "), ";
   }
+
   Builder += ")";
 }
 
@@ -340,12 +341,21 @@ std::vector<diff::NodeId> findSourceDiff(const diff::SyntaxTree& SrcTree,
   std::vector<diff::NodeId> DiffNodes;
   for (diff::NodeId Dst : DstTree) {
     const diff::Node &DstNode = DstTree.getNode(Dst);
+    // Cover updates and update-moves
     if (DstNode.Change != diff::None && DstNode.Change != diff::Insert) {
       diff::NodeId Src = Diff.getMapped(DstTree, Dst);
       DiffNodes.push_back(Src);
     }
+    // If insert, then the parent of insert is a diff in the source tree
+    else if (DstNode.Change == diff::Insert) {
+      diff::NodeId Src = Diff.getMapped(DstTree, DstNode.Parent);
+      if (Src.isValid()) {
+        DiffNodes.push_back(Src);
+      }
+    }
   }
 
+  // Cover deletes
   for (diff::NodeId Src : SrcTree) {
     if (Diff.getMapped(SrcTree, Src).isInvalid()) {
       DiffNodes.push_back(Src);
