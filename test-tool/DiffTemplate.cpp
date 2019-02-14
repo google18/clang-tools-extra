@@ -3,10 +3,12 @@
 #include "clang/Tooling/CommonOptionsParser.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/CommandLine.h"
-#include <vector>
-#include <stack>
 #include <deque>
+#include <stack>
 #include <unordered_set>
+#include <vector>
+#include <iostream>
+#include <fstream>
 
 using namespace llvm;
 using namespace clang;
@@ -83,14 +85,13 @@ getAST(const std::unique_ptr<CompilationDatabase> &CommonCompilations,
 std::string toMatcherName(llvm::StringRef TypeLabel) {
   if (TypeLabel.startswith(StringRef("CXX"))) {
     return "cxx" + TypeLabel.drop_front(3).str();
-  }
-  else {
-    return std::string(1, tolower(TypeLabel[0])) + TypeLabel.drop_front(1).str();
+  } else {
+    return std::string(1, tolower(TypeLabel[0])) +
+           TypeLabel.drop_front(1).str();
   }
 }
 
-void printTreeRecursive(const diff::SyntaxTree& Tree, 
-                        const diff::NodeId CurrId,
+void printTreeRecursive(const diff::SyntaxTree &Tree, const diff::NodeId CurrId,
                         size_t Level) {
   for (size_t i = 0; i < Level; i++) {
     llvm::outs() << "-";
@@ -106,15 +107,15 @@ void printTreeRecursive(const diff::SyntaxTree& Tree,
   }
 }
 
-void printTree(const diff::SyntaxTree& Tree) {
+void printTree(const diff::SyntaxTree &Tree) {
   printTreeRecursive(Tree, Tree.getRootId(), 0);
 }
 
-std::string exprMatcher(const Expr* E) {
+std::string exprMatcher(const Expr *E) {
   std::string String;
-  const clang::Type* TypePtr = E->getType().getTypePtr();
+  const clang::Type *TypePtr = E->getType().getTypePtr();
   if (TypePtr) {
-    CXXRecordDecl* R = TypePtr->getAsCXXRecordDecl();
+    CXXRecordDecl *R = TypePtr->getAsCXXRecordDecl();
     if (R) {
       String += "hasType(cxxRecordDecl(hasName(\"";
       String += R->getNameAsString();
@@ -133,33 +134,38 @@ std::string exprMatcher(const Expr* E) {
   return String;
 }
 
-// Creates matcher code for the arguments of a callExpr.
-std::string callExprArgs(const CallExpr* CE) { 
+// Creates matcher code for each argument within a callExpr.
+std::string callExprArgs(const CallExpr *CE) {
   std::string MatchCode;
   CallExpr::const_arg_range Args = CE->arguments();
-  size_t i = 0;
-  for (const Expr* Arg : Args) {
-    MatchCode += "hasArgument(" + std::to_string(i) + ", ";
-    MatchCode += "expr()), "; // TODO: recurse here?
-    ++i;
+  if (Args.begin() != Args.end()) {
+    MatchCode += "argumentCountIs(";
+    MatchCode += std::to_string(CE->getNumArgs());
+    MatchCode += "),";
+    int i = 0;
+    for (const clang::Expr *Arg : Args) {
+      MatchCode += "hasArgument(" + std::to_string(i) + ", ";
+      MatchCode += "declRefExpr()), "; // TODO: recurse here?
+      ++i;
+    }
   }
   return MatchCode;
 }
 
-// Creates matcher code for the callee of a call expr.
-std::string callExprCallee(const CallExpr* CE){
+// Creates matcher code for each instance of callee within a call expr.
+std::string callExprCallee(const CallExpr *CE) {
   std::string MatchCode;
-  const clang::FunctionDecl* dirCallee = CE->getDirectCallee();
-  if(dirCallee){
+  const clang::FunctionDecl *dirCallee = CE->getDirectCallee();
+  if (dirCallee) {
     MatchCode += "callee(";
-    //might need to generalize
+    // might need to generalize
     MatchCode += "functionDecl(hasName(\"";
-    MatchCode += dirCallee->getNameAsString()  + "\"))), ";
+    MatchCode += dirCallee->getNameAsString() + "\"))), ";
   }
   return MatchCode;
 }
 
-std::string nameMatcher(const NamedDecl* D) {
+std::string nameMatcher(const NamedDecl *D) {
   std::string String;
   String += "hasName(\"";
   String += D->getNameAsString();
@@ -191,9 +197,8 @@ std::string constructExprMatcher(const CXXConstructExpr* E) {
 
 // Recursively print the matcher for a Tree at the
 // given NodeId root
-void printMatcher(const diff::SyntaxTree& Tree,
-                  const diff::NodeId& Id,
-                  std::string& Builder) {
+void printMatcher(const diff::SyntaxTree &Tree, const diff::NodeId &Id,
+                  std::string &Builder) {
 
   // Get the Node object
   const diff::Node CurrNode = Tree.getNode(Id);
@@ -218,14 +223,16 @@ void printMatcher(const diff::SyntaxTree& Tree,
   }
 
   const NamedDecl* D = ASTNode.get<NamedDecl>();
+
   if (D) {
     Builder += nameMatcher(D);
   }
 
-  const CXXConstructExpr* C = ASTNode.get<CXXConstructExpr>();
+  const CXXConstructExpr *C = ASTNode.get<CXXConstructExpr>();
   if (C) {
     Builder += constructExprMatcher(C);
   }
+
 
   const CallExpr* CE = ASTNode.get<CallExpr>();
   if (CE) {
@@ -245,7 +252,7 @@ void printMatcher(const diff::SyntaxTree& Tree,
 
 // Removes malformed comma patterns in the resulting matcher
 // string
-void cleanUpCommas(std::string& String) {
+void cleanUpCommas(std::string &String) {
   size_t Pos = std::string::npos;
   while ((Pos = String.find(", )")) != std::string::npos) {
     String.erase(Pos, 2);
@@ -253,8 +260,8 @@ void cleanUpCommas(std::string& String) {
 }
 
 // Find root-to-node path for lowest common ancestor
-std::deque<diff::NodeId> findRootPath(const diff::SyntaxTree& Tree, 
-                                      const diff::NodeId& Id) {
+std::deque<diff::NodeId> findRootPath(const diff::SyntaxTree &Tree,
+                                      const diff::NodeId &Id) {
   std::deque<diff::NodeId> Deque;
   diff::NodeId CurrId = Id;
   Deque.push_front(CurrId);
@@ -278,7 +285,7 @@ diff::NodeId LCA(const diff::SyntaxTree& Tree,
   for (diff::NodeId Id : Ids) {
     Paths.push_back(findRootPath(Tree, Id));
   }
-  
+
   for (std::deque<diff::NodeId> Path : Paths) {
     for (diff::NodeId Id : Path) {
       llvm::outs() << Id.Id << ", ";
@@ -289,7 +296,7 @@ diff::NodeId LCA(const diff::SyntaxTree& Tree,
   // LCA is bounded by length of shortest path
   size_t ShortestLength = Paths[0].size();
   for (size_t i = 0; i < Paths.size(); i++) {
-    if (Paths[i].size() < ShortestLength) 
+    if (Paths[i].size() < ShortestLength)
       ShortestLength = Paths[i].size();
   }
 
@@ -311,14 +318,13 @@ diff::NodeId LCA(const diff::SyntaxTree& Tree,
 
 // Find highest but most specific ancestor of given node
 // This is where we bind the root of our matcher
-diff::NodeId walkUpNode(const diff::SyntaxTree& Tree,
-                        const diff::NodeId Id) {
+diff::NodeId walkUpNode(const diff::SyntaxTree &Tree, const diff::NodeId Id) {
   diff::NodeId CurrId = Id;
   while (CurrId != Tree.getRootId()) {
     diff::NodeId Parent = Tree.getNode(CurrId).Parent;
     diff::Node ParentNode = Tree.getNode(Parent);
     llvm::StringRef ParentType = ParentNode.getTypeLabel();
-    if (ParentType.equals(llvm::StringRef("DeclStmt")) || 
+    if (ParentType.equals(llvm::StringRef("DeclStmt")) ||
         ParentType.equals(llvm::StringRef("CompoundStmt")) ||
         ParentType.equals(llvm::StringRef("TranslationUnitDecl"))) {
       return CurrId;
@@ -328,11 +334,11 @@ diff::NodeId walkUpNode(const diff::SyntaxTree& Tree,
   return CurrId;
 }
 
-// Utility for computing a list of diffs with respect to the 
+// Utility for computing a list of diffs with respect to the
 // source SyntaxTree
-std::vector<diff::NodeId> findSourceDiff(const diff::SyntaxTree& SrcTree,
-                                         const diff::SyntaxTree& DstTree,
-                                         const diff::ASTDiff& Diff) {
+std::vector<diff::NodeId> findSourceDiff(const diff::SyntaxTree &SrcTree,
+                                         const diff::SyntaxTree &DstTree,
+                                         const diff::ASTDiff &Diff) {
   std::vector<diff::NodeId> DiffNodes;
   for (diff::NodeId Dst : DstTree) {
     const diff::Node &DstNode = DstTree.getNode(Dst);
@@ -358,6 +364,13 @@ std::vector<diff::NodeId> findSourceDiff(const diff::SyntaxTree& SrcTree,
     }
   }
   return DiffNodes;
+}
+
+void writeToFile(std::string in){
+  std::ofstream file; //("matcherDump.txt");
+  file.open("matcherDump.cpp");
+  file << in;
+  file.close();
 }
 
 int main(int argc, const char **argv) {
@@ -388,11 +401,11 @@ int main(int argc, const char **argv) {
 
   diff::SyntaxTree SrcTree(Src->getASTContext());
   diff::SyntaxTree DstTree(Dst->getASTContext());
-  diff::ASTDiff Diff(SrcTree, DstTree, Options); 
-  
+  diff::ASTDiff Diff(SrcTree, DstTree, Options);
+
   printTree(SrcTree);
   llvm::outs() << "\n";
- 
+
   std::vector<diff::NodeId> DiffNodes = findSourceDiff(SrcTree, DstTree, Diff);
   for (diff::NodeId Id : DiffNodes) {
     llvm::outs() << Id.Id << ", ";
