@@ -28,6 +28,13 @@ static cl::opt<std::string> DestinationPath(cl::Positional,
 static cl::opt<std::string> BuildPath("p", cl::desc("Build path"), cl::init(""),
                                       cl::Optional, cl::cat(ClangDiffCategory));
 
+static cl::opt<bool> MatchExpr("expr", cl::desc("Enable expressions"), cl::init(false));
+static cl::opt<bool> MatchBinOp("binop", cl::desc("Enable binary operators"), cl::init(false));
+static cl::opt<bool> MatchParmVarDecl("parmvardecl", cl::desc("Enable paramter variable declarations"), cl::init(false));
+static cl::opt<bool> MatchCallExpr("callexpr", cl::desc("Enable calls"), cl::init(false));
+static cl::opt<bool> MatchNamedDecl("nameddecl", cl::desc("Enable named declarations"), cl::init(false));
+static cl::opt<bool> MatchConstructExpr("constructexpr", cl::desc("Enable construtor expressions"), cl::init(false));
+
 static cl::list<std::string> ArgsAfter(
     "extra-arg",
     cl::desc("Additional argument to append to the compiler command line"),
@@ -173,6 +180,17 @@ std::string nameMatcher(const NamedDecl *D) {
   return String;
 }
 
+std::string binOpMatcher(const BinaryOperator* B) {
+  std::string String;
+  String += "hasOperatorName(\"" + B->getOpcodeStr().str() + "\"), ";
+  if (B->isAssignmentOp()) {
+    String += "isAssignmentOp(), ";
+  }
+  String += "hasLHS(expr()), "; // TODO: recurse?
+  String += "hasRHS(expr()), ";
+  return String;
+}
+
 std::string parmMatcher(const ParmVarDecl* P) {
   std::string String;
   if (P -> hasDefaultArg()) {
@@ -195,6 +213,18 @@ std::string constructExprMatcher(const CXXConstructExpr* E) {
   return String;
 }
 
+std::string constructExprArgMatcher(const CXXConstructExpr* E) {
+  std::string String;
+  CXXConstructExpr::const_arg_range Args = E->arguments();
+  size_t i = 0;
+  for (const Expr* Arg : Args) {
+    // TODO: recurse?
+    String += "hasArgument(" + std::to_string(i) + ", expr()), ";
+    ++i;
+  }
+  return String;
+}
+
 // Recursively print the matcher for a Tree at the
 // given NodeId root
 void printMatcher(const diff::SyntaxTree &Tree, const diff::NodeId &Id,
@@ -211,36 +241,44 @@ void printMatcher(const diff::SyntaxTree &Tree, const diff::NodeId &Id,
   Builder += "(";
 
   const Expr* E = ASTNode.get<Expr>();
-  if (E) {
+  if (MatchExpr && E) {
     Builder += exprMatcher(E);
   }
 
   // TODO: ADD MORE NARROWING MATCHERS HERE
 
+  const BinaryOperator* B = ASTNode.get<BinaryOperator>();
+  if (MatchBinOp && B) {
+    Builder += binOpMatcher(B);
+  }
+
   const ParmVarDecl* P = ASTNode.get<ParmVarDecl>();
-  if (P) {
+  if (MatchParmVarDecl && P) {
     Builder += parmMatcher(P);
   }
 
   const NamedDecl* D = ASTNode.get<NamedDecl>();
-
-  if (D) {
+  if (MatchNamedDecl && D) {
     Builder += nameMatcher(D);
   }
 
-  const CXXConstructExpr *C = ASTNode.get<CXXConstructExpr>();
-  if (C) {
+  const CXXConstructExpr* C = ASTNode.get<CXXConstructExpr>();
+  if (MatchConstructExpr && C) {
     Builder += constructExprMatcher(C);
+    Builder += constructExprArgMatcher(C);
   }
 
 
   const CallExpr* CE = ASTNode.get<CallExpr>();
-  if (CE) {
+  if (MatchCallExpr && CE) {
     Builder += callExprCallee(CE);
     Builder += callExprArgs(CE);
   }
 
   // Recurse through children
+  // TODO: recurse only through some (?) children
+  // i.e. let CallExpr, BinaryOperator handle their
+  // children independently
   for (diff::NodeId Child : CurrNode.Children) {
     Builder += "has(";
     printMatcher(Tree, Child, Builder);
