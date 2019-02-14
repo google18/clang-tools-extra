@@ -195,7 +195,7 @@ std::string namespaceDeclMatcher(const NamespaceDecl* N) {
   return String;
 }
 
-std::string cxxConstructorDecl(const CXXConstructorDecl* CCD) {
+std::string cxxConstructorDeclMatcher(const CXXConstructorDecl* CCD) {
   std::string String;
   if (CCD->isDefaultConstructor()) {
     String += "isDefaultConstructor(), ";
@@ -255,7 +255,7 @@ void printMatcher(const diff::SyntaxTree& Tree,
 
   const CXXConstructorDecl* CCD = ASTNode.get<CXXConstructorDecl>();
   if (CCD) {
-    Builder += cxxConstructorDecl(CCD);
+    Builder += cxxConstructorDeclMatcher(CCD);
   }
 
   // Recurse through children
