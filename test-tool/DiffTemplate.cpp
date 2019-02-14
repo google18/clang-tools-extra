@@ -165,9 +165,11 @@ std::string callExprCallee(const CallExpr* CE){
 
 std::string nameMatcher(const NamedDecl* D) {
   std::string String;
-  String += "hasName(\"";
-  String += D->getNameAsString();
-  String += "\"), ";
+  if (!D->getNameAsString().empty()) {
+    String += "hasName(\"";
+    String += D->getNameAsString();
+    String += "\"), ";
+  }
   return String;
 }
 
@@ -187,8 +189,22 @@ std::string constructExprMatcher(const CXXConstructExpr* E) {
 
 std::string namespaceDeclMatcher(const NamespaceDecl* N) {
   std::string String;
-  if (N->isAnonymous()) {
-    String += "isAnonymous()";
+  if (N->isAnonymousNamespace()) {
+    String += "isAnonymous(), ";
+  }
+  return String;
+}
+
+std::string cxxConstructorDecl(const CXXConstructorDecl* CCD) {
+  std::string String;
+  if (CCD->isDefaultConstructor()) {
+    String += "isDefaultConstructor(), ";
+  }
+  if (CCD->isCopyConstructor()) {
+    String += "isCopyConstructor(), ";
+  }
+  if (CCD->isMoveConstructor()) {
+    String += "isMoveConstructor(), ";
   }
   return String;
 }
@@ -235,6 +251,11 @@ void printMatcher(const diff::SyntaxTree& Tree,
   const NamespaceDecl* N = ASTNode.get<NamespaceDecl>();
   if (N) {
     Builder += namespaceDeclMatcher(N);
+  }
+
+  const CXXConstructorDecl* CCD = ASTNode.get<CXXConstructorDecl>();
+  if (CCD) {
+    Builder += cxxConstructorDecl(CCD);
   }
 
   // Recurse through children
