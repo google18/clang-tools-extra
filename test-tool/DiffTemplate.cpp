@@ -3,10 +3,12 @@
 #include "clang/Tooling/CommonOptionsParser.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/CommandLine.h"
-#include <vector>
-#include <stack>
 #include <deque>
+#include <stack>
 #include <unordered_set>
+#include <vector>
+#include <iostream>
+#include <fstream>
 
 using namespace llvm;
 using namespace clang;
@@ -83,14 +85,13 @@ getAST(const std::unique_ptr<CompilationDatabase> &CommonCompilations,
 std::string toMatcherName(llvm::StringRef TypeLabel) {
   if (TypeLabel.startswith(StringRef("CXX"))) {
     return "cxx" + TypeLabel.drop_front(3).str();
-  }
-  else {
-    return std::string(1, tolower(TypeLabel[0])) + TypeLabel.drop_front(1).str();
+  } else {
+    return std::string(1, tolower(TypeLabel[0])) +
+           TypeLabel.drop_front(1).str();
   }
 }
 
-void printTreeRecursive(const diff::SyntaxTree& Tree, 
-                        const diff::NodeId CurrId,
+void printTreeRecursive(const diff::SyntaxTree &Tree, const diff::NodeId CurrId,
                         size_t Level) {
   for (size_t i = 0; i < Level; i++) {
     llvm::outs() << "-";
@@ -106,15 +107,15 @@ void printTreeRecursive(const diff::SyntaxTree& Tree,
   }
 }
 
-void printTree(const diff::SyntaxTree& Tree) {
+void printTree(const diff::SyntaxTree &Tree) {
   printTreeRecursive(Tree, Tree.getRootId(), 0);
 }
 
-std::string exprMatcher(const Expr* E) {
+std::string exprMatcher(const Expr *E) {
   std::string String;
-  const clang::Type* TypePtr = E->getType().getTypePtr();
+  const clang::Type *TypePtr = E->getType().getTypePtr();
   if (TypePtr) {
-    CXXRecordDecl* R = TypePtr->getAsCXXRecordDecl();
+    CXXRecordDecl *R = TypePtr->getAsCXXRecordDecl();
     if (R) {
       String += "hasType(cxxRecordDecl(hasName(\"";
       String += R->getNameAsString();
@@ -133,15 +134,16 @@ std::string exprMatcher(const Expr* E) {
   return String;
 }
 
-// Creates matcher code for the arguments of a callExpr.
-std::string callExprArgs(const CallExpr* CE){ 
+// Creates matcher code for each argument within a callExpr.
+std::string callExprArgs(const CallExpr *CE) {
   std::string MatchCode;
-  std::vector<const clang::Expr*> ArgVector; 
   CallExpr::const_arg_range Args = CE->arguments();
-  if(Args.begin() != Args.end()){
+  if (Args.begin() != Args.end()) {
+    MatchCode += "argumentCountIs(";
+    MatchCode += std::to_string(CE->getNumArgs());
+    MatchCode += "),";
     int i = 0;
-    for(const clang::Expr* Arg : Args ){
-      ArgVector.push_back(Arg);
+    for (const clang::Expr *Arg : Args) {
       MatchCode += "hasArgument(" + std::to_string(i) + ", ";
       MatchCode += "declRefExpr()), "; // TODO: recurse here?
       ++i;
@@ -150,20 +152,20 @@ std::string callExprArgs(const CallExpr* CE){
   return MatchCode;
 }
 
-// Creates matcher code for the callee of a call expr.
-std::string callExprCallee(const CallExpr* CE){
+// Creates matcher code for each instance of callee within a call expr.
+std::string callExprCallee(const CallExpr *CE) {
   std::string MatchCode;
-  const clang::FunctionDecl* dirCallee = CE->getDirectCallee();
-  if(dirCallee){
+  const clang::FunctionDecl *dirCallee = CE->getDirectCallee();
+  if (dirCallee) {
     MatchCode += "callee(";
-    //might need to generalize
+    // might need to generalize
     MatchCode += "functionDecl(hasName(\"";
-    MatchCode += dirCallee->getNameAsString()  + "\"))), ";
+    MatchCode += dirCallee->getNameAsString() + "\"))), ";
   }
   return MatchCode;
 }
 
-std::string nameMatcher(const NamedDecl* D) {
+std::string nameMatcher(const NamedDecl *D) {
   std::string String;
   String += "hasName(\"";
   String += D->getNameAsString();
@@ -171,7 +173,7 @@ std::string nameMatcher(const NamedDecl* D) {
   return String;
 }
 
-std::string constructExprMatcher(const CXXConstructExpr* E) {
+std::string constructExprMatcher(const CXXConstructExpr *E) {
   std::string String;
   String += "argumentCountIs(";
   String += std::to_string(E->getNumArgs());
@@ -187,9 +189,8 @@ std::string constructExprMatcher(const CXXConstructExpr* E) {
 
 // Recursively print the matcher for a Tree at the
 // given NodeId root
-void printMatcher(const diff::SyntaxTree& Tree,
-                  const diff::NodeId& Id,
-                  std::string& Builder) {
+void printMatcher(const diff::SyntaxTree &Tree, const diff::NodeId &Id,
+                  std::string &Builder) {
 
   // Get the Node object
   const diff::Node CurrNode = Tree.getNode(Id);
@@ -208,17 +209,17 @@ void printMatcher(const diff::SyntaxTree& Tree,
 
   // TODO: ADD MORE NARROWING MATCHERS HERE
 
-  const NamedDecl* D = ASTNode.get<NamedDecl>();
+  const NamedDecl *D = ASTNode.get<NamedDecl>();
   if (D) {
     Builder += nameMatcher(D);
   }
 
-  const CXXConstructExpr* C = ASTNode.get<CXXConstructExpr>();
+  const CXXConstructExpr *C = ASTNode.get<CXXConstructExpr>();
   if (C) {
     Builder += constructExprMatcher(C);
   }
 
-  const CallExpr* CE = ASTNode.get<CallExpr>();
+  const CallExpr *CE = ASTNode.get<CallExpr>();
   /*if (CE) {
     Builder += callExprCallee(CE);
     Builder += callExprArgs(CE);
@@ -235,7 +236,7 @@ void printMatcher(const diff::SyntaxTree& Tree,
 
 // Removes malformed comma patterns in the resulting matcher
 // string
-void cleanUpCommas(std::string& String) {
+void cleanUpCommas(std::string &String) {
   size_t Pos = std::string::npos;
   while ((Pos = String.find(", )")) != std::string::npos) {
     String.erase(Pos, 2);
@@ -243,16 +244,16 @@ void cleanUpCommas(std::string& String) {
 }
 
 namespace std {
-  template<> struct hash<diff::NodeId> {
-    std::size_t operator()(const diff::NodeId& p) const noexcept {
-      return std::hash<int>()(p.Id);
-    }
-  };
-}
+template <> struct hash<diff::NodeId> {
+  std::size_t operator()(const diff::NodeId &p) const noexcept {
+    return std::hash<int>()(p.Id);
+  }
+};
+} // namespace std
 
 // Find root-to-node path for lowest common ancestor
-std::deque<diff::NodeId> findRootPath(const diff::SyntaxTree& Tree, 
-                                      const diff::NodeId& Id) {
+std::deque<diff::NodeId> findRootPath(const diff::SyntaxTree &Tree,
+                                      const diff::NodeId &Id) {
   std::deque<diff::NodeId> Deque;
   diff::NodeId CurrId = Id;
   Deque.push_front(CurrId);
@@ -264,7 +265,7 @@ std::deque<diff::NodeId> findRootPath(const diff::SyntaxTree& Tree,
 }
 
 // Lowest common ancestor for multiple nodes in AST
-std::unordered_set<diff::NodeId> LCA(const diff::SyntaxTree& Tree, 
+std::unordered_set<diff::NodeId> LCA(const diff::SyntaxTree &Tree,
                                      std::vector<diff::NodeId> Ids) {
   if (Ids.empty()) {
     llvm::outs() << "No AST difference found!\n";
@@ -276,7 +277,7 @@ std::unordered_set<diff::NodeId> LCA(const diff::SyntaxTree& Tree,
   for (diff::NodeId Id : Ids) {
     Paths.push_back(findRootPath(Tree, Id));
   }
-  
+
   for (std::deque<diff::NodeId> Path : Paths) {
     for (diff::NodeId Id : Path) {
       llvm::outs() << Id.Id << ", ";
@@ -287,7 +288,7 @@ std::unordered_set<diff::NodeId> LCA(const diff::SyntaxTree& Tree,
   // LCA is bounded by length of shortest path
   size_t ShortestLength = Paths[0].size();
   for (size_t i = 0; i < Paths.size(); i++) {
-    if (Paths[i].size() < ShortestLength) 
+    if (Paths[i].size() < ShortestLength)
       ShortestLength = Paths[i].size();
   }
 
@@ -304,25 +305,24 @@ std::unordered_set<diff::NodeId> LCA(const diff::SyntaxTree& Tree,
           DiffNodes.insert(P[Idx]);
         }
         return DiffNodes;
-      } 
+      }
     }
   }
- 
+
   std::unordered_set<diff::NodeId> Singleton;
-  Singleton.insert(Paths[0][ShortestLength-1]);
+  Singleton.insert(Paths[0][ShortestLength - 1]);
   return Singleton;
 }
 
 // Find highest but most specific ancestor of given node
 // This is where we bind the root of our matcher
-diff::NodeId walkUpNode(const diff::SyntaxTree& Tree,
-                        const diff::NodeId Id) {
+diff::NodeId walkUpNode(const diff::SyntaxTree &Tree, const diff::NodeId Id) {
   diff::NodeId CurrId = Id;
   while (CurrId != Tree.getRootId()) {
     diff::NodeId Parent = Tree.getNode(CurrId).Parent;
     diff::Node ParentNode = Tree.getNode(Parent);
     llvm::StringRef ParentType = ParentNode.getTypeLabel();
-    if (ParentType.equals(llvm::StringRef("DeclStmt")) || 
+    if (ParentType.equals(llvm::StringRef("DeclStmt")) ||
         ParentType.equals(llvm::StringRef("CompoundStmt")) ||
         ParentType.equals(llvm::StringRef("TranslationUnitDecl"))) {
       return CurrId;
@@ -332,11 +332,11 @@ diff::NodeId walkUpNode(const diff::SyntaxTree& Tree,
   return CurrId;
 }
 
-// Utility for computing a list of diffs with respect to the 
+// Utility for computing a list of diffs with respect to the
 // source SyntaxTree
-std::vector<diff::NodeId> findSourceDiff(const diff::SyntaxTree& SrcTree,
-                                         const diff::SyntaxTree& DstTree,
-                                         const diff::ASTDiff& Diff) {
+std::vector<diff::NodeId> findSourceDiff(const diff::SyntaxTree &SrcTree,
+                                         const diff::SyntaxTree &DstTree,
+                                         const diff::ASTDiff &Diff) {
   std::vector<diff::NodeId> DiffNodes;
   for (diff::NodeId Dst : DstTree) {
     const diff::Node &DstNode = DstTree.getNode(Dst);
@@ -352,6 +352,13 @@ std::vector<diff::NodeId> findSourceDiff(const diff::SyntaxTree& SrcTree,
     }
   }
   return DiffNodes;
+}
+
+void writeToFile(std::string in){
+  std::ofstream file; //("matcherDump.txt");
+  file.open("matcherDump.cpp");
+  file << in;
+  file.close();
 }
 
 int main(int argc, const char **argv) {
@@ -382,11 +389,11 @@ int main(int argc, const char **argv) {
 
   diff::SyntaxTree SrcTree(Src->getASTContext());
   diff::SyntaxTree DstTree(Dst->getASTContext());
-  diff::ASTDiff Diff(SrcTree, DstTree, Options); 
-  
+  diff::ASTDiff Diff(SrcTree, DstTree, Options);
+
   printTree(SrcTree);
   llvm::outs() << "\n";
- 
+
   std::vector<diff::NodeId> DiffNodes = findSourceDiff(SrcTree, DstTree, Diff);
   for (diff::NodeId Id : DiffNodes) {
     llvm::outs() << Id.Id << ", ";
@@ -397,7 +404,7 @@ int main(int argc, const char **argv) {
   std::unordered_set<diff::NodeId> Ancestors = LCA(SrcTree, DiffNodes);
   if (!Ancestors.empty()) {
     for (diff::NodeId Ancestor : Ancestors) {
-      llvm::outs() << Ancestor.Id << "\n"; 
+      llvm::outs() << Ancestor.Id << "\n";
     }
 
     for (diff::NodeId DiffRoot : Ancestors) {
@@ -405,7 +412,8 @@ int main(int argc, const char **argv) {
       printMatcher(SrcTree, DiffRoot, MatcherString);
       cleanUpCommas(MatcherString);
       llvm::outs() << MatcherString << "\n";
+      writeToFile(MatcherString);
     }
-  } 
+  }
   return 0;
 }
