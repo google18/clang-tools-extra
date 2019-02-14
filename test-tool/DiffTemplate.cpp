@@ -185,6 +185,14 @@ std::string constructExprMatcher(const CXXConstructExpr* E) {
   return String;
 }
 
+std::string namespaceDeclMatcher(const NamespaceDecl* N) {
+  std::string String;
+  if (N->isAnonymous()) {
+    String += "isAnonymous()";
+  }
+  return String;
+}
+
 // Recursively print the matcher for a Tree at the
 // given NodeId root
 void printMatcher(const diff::SyntaxTree& Tree,
@@ -222,6 +230,11 @@ void printMatcher(const diff::SyntaxTree& Tree,
   if (CE) {
     Builder += callExprCallee(CE);
     Builder += callExprArgs(CE);
+  }
+
+  const NamespaceDecl* N = ASTNode.get<NamespaceDecl>();
+  if (N) {
+    Builder += namespaceDeclMatcher(N);
   }
 
   // Recurse through children
