@@ -9,5 +9,6 @@ target_link_libraries(test-tool
   clangFrontend
   clangTooling
   clangToolingASTDiff
+  clangToolingMatcherGen
   clangDynamicASTMatchers
   )
