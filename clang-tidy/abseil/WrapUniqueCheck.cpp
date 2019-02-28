@@ -24,7 +24,7 @@ std::string WrapUniqueCheck::getArgs(const SourceManager *SM,
       CharSourceRange::getCharRange(MemExpr->getSourceRange()), *SM,
       LangOptions());
 
-  return (ArgRef.str().length() > 0) ? ArgRef.str() + ")" : "()";
+  return (!ArgRef.str().empty()) ? ArgRef.str() + ")" : "()";
 }
 
 void WrapUniqueCheck::registerMatchers(MatchFinder *Finder) {
