@@ -53,12 +53,12 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SymbolOrigin O) {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, Symbol::SymbolFlag F) {
   if (F == Symbol::None)
     return OS << "None";
-  std::string s;
+  std::string S;
   if (F & Symbol::Deprecated)
-    s += "deprecated|";
+    S += "deprecated|";
   if (F & Symbol::IndexedForCodeCompletion)
-    s += "completion|";
-  return OS << llvm::StringRef(s).rtrim('|');
+    S += "completion|";
+  return OS << llvm::StringRef(S).rtrim('|');
 }
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Symbol &S) {
@@ -179,7 +179,8 @@ bool fromJSON(const llvm::json::Value &Parameters, FuzzyFindRequest &Request) {
       O && O.map("Query", Request.Query) && O.map("Scopes", Request.Scopes) &&
       O.map("AnyScope", Request.AnyScope) && O.map("Limit", Limit) &&
       O.map("RestrictForCodeCompletion", Request.RestrictForCodeCompletion) &&
-      O.map("ProximityPaths", Request.ProximityPaths);
+      O.map("ProximityPaths", Request.ProximityPaths) &&
+      O.map("PreferredTypes", Request.PreferredTypes);
   if (OK && Limit <= std::numeric_limits<uint32_t>::max())
     Request.Limit = Limit;
   return OK;
@@ -193,6 +194,7 @@ llvm::json::Value toJSON(const FuzzyFindRequest &Request) {
       {"Limit", Request.Limit},
       {"RestrictForCodeCompletion", Request.RestrictForCodeCompletion},
       {"ProximityPaths", llvm::json::Array{Request.ProximityPaths}},
+      {"PreferredTypes", llvm::json::Array{Request.PreferredTypes}},
   };
 }
 
