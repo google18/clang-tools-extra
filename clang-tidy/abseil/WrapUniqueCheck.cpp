@@ -18,13 +18,13 @@ namespace clang {
 namespace tidy {
 namespace abseil {
 
-std::string WrapUniqueCheck::getArgs(const SourceManager *SM,
+static std::string getArgs(const SourceManager *SM,
                                      const CallExpr *MemExpr) {
   llvm::StringRef ArgRef = Lexer::getSourceText(
       CharSourceRange::getCharRange(MemExpr->getSourceRange()), *SM,
       LangOptions());
 
-  return (!ArgRef.str().empty()) ? ArgRef.str() + ")" : "()";
+  return (!ArgRef.empty()) ? ArgRef.str() + ")" : "()";
 }
 
 void WrapUniqueCheck::registerMatchers(MatchFinder *Finder) {
@@ -50,53 +50,49 @@ void WrapUniqueCheck::registerMatchers(MatchFinder *Finder) {
 void WrapUniqueCheck::check(const MatchFinder::MatchResult &Result) {
   // gets the instance of factory constructor
   const SourceManager *SM = Result.SourceManager;
-  const auto *facExpr = Result.Nodes.getNodeAs<CXXMemberCallExpr>("facCons");
-  const auto *callExpr = Result.Nodes.getNodeAs<CallExpr>("callExpr");
+  const auto *FacExpr = Result.Nodes.getNodeAs<CXXMemberCallExpr>("facCons");
+  const auto *Cons = Result.Nodes.getNodeAs<CXXConstructExpr>("upfc");
+  if (FacExpr) {
+    const auto *CExpr = Result.Nodes.getNodeAs<CallExpr>("callExpr");
+    std::string DiagText = "Perfer absl::WrapUnique for resetting unique_ptr";
 
-  const auto *cons = Result.Nodes.getNodeAs<CXXConstructExpr>("upfc");
-  const auto *consDecl = Result.Nodes.getNodeAs<Decl>("cons_decl");
-  const auto *FC_Call = Result.Nodes.getNodeAs<CallExpr>("FC_call");
-
-  if (facExpr) {
-    std::string diagText = "Perfer absl::WrapUnique for resetting unique_ptr";
-    std::string newText;
-
-    const Expr *ObjectArg = facExpr->getImplicitObjectArgument();
+    const Expr *ObjectArg = FacExpr->getImplicitObjectArgument();
     SourceLocation Target = ObjectArg->getExprLoc();
     llvm::StringRef ObjName =
         Lexer::getSourceText(CharSourceRange::getCharRange(
                                  ObjectArg->getBeginLoc(),
-                                 facExpr->getExprLoc().getLocWithOffset(-1)),
+                                 FacExpr->getExprLoc().getLocWithOffset(-1)),
                              *SM, LangOptions());
 
-    newText =
-        ObjName.str() + " = absl::WrapUnique(" + getArgs(SM, callExpr) + ")";
+    std::string NewText =
+        ObjName.str() + " = absl::WrapUnique(" + getArgs(SM, CExpr) + ")";
 
-    diag(Target, diagText) << FixItHint::CreateReplacement(
-        CharSourceRange::getTokenRange(Target, facExpr->getEndLoc()), newText);
+    diag(Target, DiagText) << FixItHint::CreateReplacement(
+        CharSourceRange::getTokenRange(Target, FacExpr->getEndLoc()), NewText);
   }
 
-  if (cons) {
-    if (cons->isListInitialization()) {
+  if (Cons) {
+    if (Cons->isListInitialization()) {
       return;
     }
 
-    std::string diagText = "Perfer absl::WrapUnique to constructing unique_ptr";
-    std::string newText;
-    std::string Left;
+    const auto *FcCall = Result.Nodes.getNodeAs<CallExpr>("FC_call");
+    const auto *ConsDecl = Result.Nodes.getNodeAs<Decl>("cons_decl");
+    std::string DiagText = "Perfer absl::WrapUnique to constructing unique_ptr";
 
     llvm::StringRef NameRef = Lexer::getSourceText(
-        CharSourceRange::getCharRange(cons->getBeginLoc(),
-                                      cons->getParenOrBraceRange().getBegin()),
+        CharSourceRange::getCharRange(Cons->getBeginLoc(),
+                                      Cons->getParenOrBraceRange().getBegin()),
         *SM, LangOptions());
 
-    Left = (consDecl) ? "auto " + NameRef.str() + " = " : "";
-    newText = Left + "absl::WrapUnique(" + getArgs(SM, FC_Call) + ")";
+    std::string Left = (ConsDecl) ? "auto " + NameRef.str() + " = " : "";
+    std::string NewText =
+        Left + "absl::WrapUnique(" + getArgs(SM, FcCall) + ")";
     SourceLocation Target =
-        (consDecl) ? consDecl->getBeginLoc() : cons->getExprLoc();
+        (ConsDecl) ? ConsDecl->getBeginLoc() : Cons->getExprLoc();
 
-    diag(Target, diagText) << FixItHint::CreateReplacement(
-        CharSourceRange::getTokenRange(Target, cons->getEndLoc()), newText);
+    diag(Target, DiagText) << FixItHint::CreateReplacement(
+        CharSourceRange::getTokenRange(Target, Cons->getEndLoc()), NewText);
   }
 }
 } // namespace abseil
