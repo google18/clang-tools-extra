@@ -2,6 +2,7 @@ set(LLVM_LINK_COMPONENTS support)
 
 add_clang_library(clangTidyAbseilModule
   AbseilTidyModule.cpp
+  DurationAdditionCheck.cpp
   DurationComparisonCheck.cpp
   DurationConversionCastCheck.cpp
   DurationDivisionCheck.cpp
@@ -9,12 +10,14 @@ add_clang_library(clangTidyAbseilModule
   DurationFactoryScaleCheck.cpp
   DurationRewriter.cpp
   DurationSubtractionCheck.cpp
+  DurationUnnecessaryConversionCheck.cpp
   FasterStrsplitDelimiterCheck.cpp
   NoInternalDependenciesCheck.cpp
   NoNamespaceCheck.cpp
   RedundantStrcatCallsCheck.cpp
   StrCatAppendCheck.cpp
   StringFindStartswithCheck.cpp
+  TimeSubtractionCheck.cpp
   UpgradeDurationConversionsCheck.cpp
   WrapUniqueCheck.cpp
 
