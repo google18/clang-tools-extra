@@ -9,21 +9,19 @@
 #include "../ClangTidy.h"
 #include "../ClangTidyModule.h"
 #include "../ClangTidyModuleRegistry.h"
-#include "DurationAdditionCheck.h"
+#include "../modernize/MakeUniqueCheck.h"
 #include "DurationComparisonCheck.h"
 #include "DurationConversionCastCheck.h"
 #include "DurationDivisionCheck.h"
 #include "DurationFactoryFloatCheck.h"
 #include "DurationFactoryScaleCheck.h"
 #include "DurationSubtractionCheck.h"
-#include "DurationUnnecessaryConversionCheck.h"
 #include "FasterStrsplitDelimiterCheck.h"
 #include "NoInternalDependenciesCheck.h"
 #include "NoNamespaceCheck.h"
 #include "RedundantStrcatCallsCheck.h"
 #include "StringFindStartswithCheck.h"
 #include "StrCatAppendCheck.h"
-#include "TimeSubtractionCheck.h"
 #include "UpgradeDurationConversionsCheck.h"
 
 namespace clang {
@@ -33,8 +31,6 @@ namespace abseil {
 class AbseilModule : public ClangTidyModule {
 public:
   void addCheckFactories(ClangTidyCheckFactories &CheckFactories) override {
-    CheckFactories.registerCheck<DurationAdditionCheck>(
-        "abseil-duration-addition");
     CheckFactories.registerCheck<DurationComparisonCheck>(
         "abseil-duration-comparison");
     CheckFactories.registerCheck<DurationConversionCastCheck>(
@@ -47,8 +43,6 @@ public:
         "abseil-duration-factory-scale");
     CheckFactories.registerCheck<DurationSubtractionCheck>(
         "abseil-duration-subtraction");
-    CheckFactories.registerCheck<DurationUnnecessaryConversionCheck>(
-        "abseil-duration-unnecessary-conversion");
     CheckFactories.registerCheck<FasterStrsplitDelimiterCheck>(
         "abseil-faster-strsplit-delimiter");
     CheckFactories.registerCheck<NoInternalDependenciesCheck>(
@@ -60,10 +54,19 @@ public:
         "abseil-str-cat-append");
     CheckFactories.registerCheck<StringFindStartswithCheck>(
         "abseil-string-find-startswith");
-    CheckFactories.registerCheck<TimeSubtractionCheck>(
-        "abseil-time-subtraction");
     CheckFactories.registerCheck<UpgradeDurationConversionsCheck>(
         "abseil-upgrade-duration-conversions");
+    CheckFactories.registerCheck<modernize::MakeUniqueCheck>(
+        "abseil-make-unique");
+  }
+
+  ClangTidyOptions getModuleOptions() override {
+    ClangTidyOptions Options;
+    ClangTidyOptions::OptionMap &Opts = Options.CheckOptions;
+    Opts["abseil-make-unique.MakeSmartPtrFunctionHeader"] = "absl/memory/memory.h";
+    Opts["abseil-make-unique.MakeSmartPtrFunction"] = "absl::make_unique";
+    Opts["abseil-make-unique.UseLegacyFunction"] = true;
+    return Options;
   }
 };
 
