@@ -13,6 +13,7 @@ Clang-Tidy Checks
    abseil-duration-subtraction
    abseil-duration-unnecessary-conversion
    abseil-faster-strsplit-delimiter
+   abseil-make-unique (redirects to modernize-make-unique) <modernize-make-unique>
    abseil-no-internal-dependencies
    abseil-no-namespace
    abseil-redundant-strcat-calls

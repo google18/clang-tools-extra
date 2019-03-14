@@ -85,6 +85,11 @@ Improvements to clang-tidy
   Finds and fixes cases where ``absl::Duration`` values are being converted to
   numeric types and back again.
 
+- New alias :doc:`abseil-make-unique
+  <clang-tidy/checks/abseil-make-unique>` to :doc:`modernize-make-unique
+  <clang-tidy/checks/modernize-make-unique>`
+  added.
+
 - New :doc:`abseil-time-subtraction
   <clang-tidy/checks/abseil-time-subtraction>` check.
 
