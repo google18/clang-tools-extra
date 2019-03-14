@@ -50,7 +50,7 @@ private:
   const std::string MakeSmartPtrFunctionHeader;
   const std::string MakeSmartPtrFunctionName;
   const bool IgnoreMacros;
-  const bool UseLegacyFunction;
+  const bool IgnoreListInit;
 
   void checkConstruct(SourceManager &SM, ASTContext *Ctx,
                       const CXXConstructExpr *Construct, const QualType *Type,

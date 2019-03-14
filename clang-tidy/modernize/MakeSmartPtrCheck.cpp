@@ -52,14 +52,14 @@ MakeSmartPtrCheck::MakeSmartPtrCheck(StringRef Name,
       MakeSmartPtrFunctionName(
           Options.get("MakeSmartPtrFunction", MakeSmartPtrFunctionName)),
       IgnoreMacros(Options.getLocalOrGlobal("IgnoreMacros", true)),
-      UseLegacyFunction(Options.getLocalOrGlobal("UseLegacyFunction", false)) {}
+      IgnoreListInit(Options.get("IgnoreListInit", false)) {}
 
 void MakeSmartPtrCheck::storeOptions(ClangTidyOptions::OptionMap &Opts) {
   Options.store(Opts, "IncludeStyle", IncludeStyle);
   Options.store(Opts, "MakeSmartPtrFunctionHeader", MakeSmartPtrFunctionHeader);
   Options.store(Opts, "MakeSmartPtrFunction", MakeSmartPtrFunctionName);
   Options.store(Opts, "IgnoreMacros", IgnoreMacros);
-  Options.store(Opts, "UseLegacyFunction", UseLegacyFunction);
+  Options.store(Opts, "IgnoreListInit", IgnoreListInit);
 }
 
 bool MakeSmartPtrCheck::isLanguageVersionSupported(
@@ -159,8 +159,8 @@ void MakeSmartPtrCheck::checkConstruct(SourceManager &SM, ASTContext *Ctx,
   if (Invalid)
     return;
 
-  // Conservatively disable for list initializations
-  if (UseLegacyFunction && New->getInitializationStyle() == CXXNewExpr::ListInit) {
+  // Disable the fix for list initializations.
+  if (IgnoreListInit && New->getInitializationStyle() == CXXNewExpr::ListInit) {
     return;
   }
 
@@ -234,8 +234,8 @@ void MakeSmartPtrCheck::checkReset(SourceManager &SM, ASTContext *Ctx,
     return;
   }
 
-  // Conservatively disable for list initializations
-  if (UseLegacyFunction && New->getInitializationStyle() == CXXNewExpr::ListInit) {
+  // Disable the fix for list initializations.
+  if (IgnoreListInit && New->getInitializationStyle() == CXXNewExpr::ListInit) {
     return;
   }
 

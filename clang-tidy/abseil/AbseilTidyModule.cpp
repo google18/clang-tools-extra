@@ -74,7 +74,7 @@ public:
     ClangTidyOptions::OptionMap &Opts = Options.CheckOptions;
     Opts["abseil-make-unique.MakeSmartPtrFunctionHeader"] = "absl/memory/memory.h";
     Opts["abseil-make-unique.MakeSmartPtrFunction"] = "absl::make_unique";
-    Opts["abseil-make-unique.UseLegacyFunction"] = true;
+    Opts["abseil-make-unique.IgnoreListInit"] = true;
     return Options;
   }
 };
