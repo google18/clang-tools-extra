@@ -51,13 +51,15 @@ MakeSmartPtrCheck::MakeSmartPtrCheck(StringRef Name,
           Options.get("MakeSmartPtrFunctionHeader", StdMemoryHeader)),
       MakeSmartPtrFunctionName(
           Options.get("MakeSmartPtrFunction", MakeSmartPtrFunctionName)),
-      IgnoreMacros(Options.getLocalOrGlobal("IgnoreMacros", true)) {}
+      IgnoreMacros(Options.getLocalOrGlobal("IgnoreMacros", true)),
+      UseLegacyFunction(Options.getLocalOrGlobal("UseLegacyFunction", false)) {}
 
 void MakeSmartPtrCheck::storeOptions(ClangTidyOptions::OptionMap &Opts) {
   Options.store(Opts, "IncludeStyle", IncludeStyle);
   Options.store(Opts, "MakeSmartPtrFunctionHeader", MakeSmartPtrFunctionHeader);
   Options.store(Opts, "MakeSmartPtrFunction", MakeSmartPtrFunctionName);
   Options.store(Opts, "IgnoreMacros", IgnoreMacros);
+  Options.store(Opts, "UseLegacyFunction", UseLegacyFunction);
 }
 
 bool MakeSmartPtrCheck::isLanguageVersionSupported(
@@ -157,6 +159,10 @@ void MakeSmartPtrCheck::checkConstruct(SourceManager &SM, ASTContext *Ctx,
   if (Invalid)
     return;
 
+  // Conservatively disable for list initializations
+  if (UseLegacyFunction && New->getInitializationStyle() == CXXNewExpr::ListInit) {
+    return;
+  }
   auto Diag = diag(ConstructCallStart, "use %0 instead")
               << MakeSmartPtrFunctionName;
 
@@ -227,6 +233,10 @@ void MakeSmartPtrCheck::checkReset(SourceManager &SM, ASTContext *Ctx,
     return;
   }
 
+  // Conservatively disable for list initializations
+  if (UseLegacyFunction && New->getInitializationStyle() == CXXNewExpr::ListInit) {
+    return;
+  }
   auto Diag = diag(ResetCallStart, "use %0 instead")
               << MakeSmartPtrFunctionName;
 

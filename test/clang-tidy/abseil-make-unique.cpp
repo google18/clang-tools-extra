@@ -1,7 +1,5 @@
 // RUN: %check_clang_tidy %s abseil-make-unique %t -- -- -std=c++11 \
 
-// CHECK-FIXES: #include <memory>
-
 namespace std {
 
 template <typename T>
@@ -51,7 +49,6 @@ int* returnPointer();
 void expectPointer(std::unique_ptr<int> p);
 
 std::unique_ptr<int> makeAndReturnPointer() {
-  // Make smart pointer in return statement
   return std::unique_ptr<int>(new int(0));
   // CHECK-MESSAGES: :[[@LINE-1]]:10: warning: use absl::make_unique instead [abseil-make-unique]
   // CHECK-FIXES: return absl::make_unique<int>(0);
