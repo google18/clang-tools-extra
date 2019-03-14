@@ -238,7 +238,7 @@ void MakeSmartPtrCheck::checkReset(SourceManager &SM, ASTContext *Ctx,
   if (UseLegacyFunction && New->getInitializationStyle() == CXXNewExpr::ListInit) {
     return;
   }
-  
+
   auto Diag = diag(ResetCallStart, "use %0 instead")
               << MakeSmartPtrFunctionName;
 
