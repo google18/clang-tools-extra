@@ -48,3 +48,8 @@ Options
 
    If set to non-zero, the check will not give warnings inside macros. Default
    is `1`.
+
+.. option:: UseLegacyFunction
+   
+   If set to non-zero, the check will ignore features from C++11 and later such
+   as list initialization. Default is `0`. 
