@@ -7,6 +7,7 @@ that returns a ``std::unqiue_ptr<T>`` then recommends using
 ``absl::wrap_unique(new T(...))``.
 
 .. code-block:: c++
+ 
   class A {
   public:
     static A* NewA() { return new A(); }

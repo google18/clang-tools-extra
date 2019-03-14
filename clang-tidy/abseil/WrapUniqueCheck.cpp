@@ -1,9 +1,8 @@
 //===--- WrapUniqueCheck.cpp - clang-tidy ---------------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -18,8 +17,7 @@ namespace clang {
 namespace tidy {
 namespace abseil {
 
-static std::string getArgs(const SourceManager *SM,
-                                     const CallExpr *MemExpr) {
+static std::string getArgs(const SourceManager *SM, const CallExpr *MemExpr) {
   llvm::StringRef ArgRef = Lexer::getSourceText(
       CharSourceRange::getCharRange(MemExpr->getSourceRange()), *SM,
       LangOptions());
@@ -72,9 +70,8 @@ void WrapUniqueCheck::check(const MatchFinder::MatchResult &Result) {
   }
 
   if (Cons) {
-    if (Cons->isListInitialization()) {
+    if (Cons->isListInitialization())
       return;
-    }
 
     const auto *FcCall = Result.Nodes.getNodeAs<CallExpr>("FC_call");
     const auto *ConsDecl = Result.Nodes.getNodeAs<Decl>("cons_decl");

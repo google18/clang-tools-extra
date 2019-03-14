@@ -115,6 +115,11 @@ Improvements to clang-tidy
   :doc:`objc-property-declaration <clang-tidy/checks/objc-property-declaration>`
   check have been removed.
 
+- New :doc:`modernize-use-auto-for-range
+  <clang-tidy/checks/modernize-use-auto-for-range>` check.
+
+  FIXME: add release notes.
+
 Improvements to include-fixer
 -----------------------------
 
