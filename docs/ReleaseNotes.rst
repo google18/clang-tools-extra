@@ -109,6 +109,10 @@ Improvements to clang-tidy
   `CommentUserDefiniedLiterals`, `CommentStringLiterals`,
   `CommentCharacterLiterals` & `CommentNullPtrs` options.
 
+- The :doc:`modernize-make-unique
+  <clang-tidy/checks/modernize-make-unique>` now supports an
+  `IgnoreListInit` option.
+
 - The `Acronyms` and `IncludeDefaultAcronyms` options for the
   :doc:`objc-property-declaration <clang-tidy/checks/objc-property-declaration>`
   check have been removed.
