@@ -207,6 +207,7 @@ Clang-Tidy Checks
    modernize-return-braced-init-list
    modernize-shrink-to-fit
    modernize-unary-static-assert
+   modernize-use-auto-for-range
    modernize-use-auto
    modernize-use-bool-literals
    modernize-use-default-member-init

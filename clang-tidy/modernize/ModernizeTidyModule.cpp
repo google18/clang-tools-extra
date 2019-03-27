@@ -26,6 +26,7 @@
 #include "ShrinkToFitCheck.h"
 #include "UnaryStaticAssertCheck.h"
 #include "UseAutoCheck.h"
+#include "UseAutoForRangeCheck.h"
 #include "UseBoolLiteralsCheck.h"
 #include "UseDefaultMemberInitCheck.h"
 #include "UseEmplaceCheck.h"
@@ -74,6 +75,8 @@ public:
     CheckFactories.registerCheck<UnaryStaticAssertCheck>(
         "modernize-unary-static-assert");
     CheckFactories.registerCheck<UseAutoCheck>("modernize-use-auto");
+    CheckFactories.registerCheck<UseAutoForRangeCheck>(
+        "modernize-use-auto-for-range");
     CheckFactories.registerCheck<UseBoolLiteralsCheck>(
         "modernize-use-bool-literals");
     CheckFactories.registerCheck<UseDefaultMemberInitCheck>(
