@@ -21,3 +21,19 @@ using ::bar::something;
 
 } // anonymous namespace
 } // namespace foo
+
+// Check should not be triggered below when we are at 
+// function (instead of namespace) scope.
+namespace outer {
+
+  int fun_scope() {
+    using ::bar::something;
+    return 0;
+  } // function scope
+  
+  namespace inner {
+
+  } // namespace inner
+
+} // namespace outer
+
