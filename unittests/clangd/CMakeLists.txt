@@ -18,21 +18,27 @@ add_extra_unittest(ClangdTests
   CodeCompletionStringsTests.cpp
   ContextTests.cpp
   DexTests.cpp
+  DiagnosticsTests.cpp
   DraftStoreTests.cpp
+  ExpectedTypeTest.cpp
   FileDistanceTests.cpp
   FileIndexTests.cpp
   FindSymbolsTests.cpp
   FSTests.cpp
+  FunctionTests.cpp
   FuzzyMatchTests.cpp
   GlobalCompilationDatabaseTests.cpp
   HeadersTests.cpp
+  IndexActionTests.cpp
   IndexTests.cpp
   JSONTransportTests.cpp
   QualityTests.cpp
   RIFFTests.cpp
+  SelectionTests.cpp
   SerializationTests.cpp
   SourceCodeTests.cpp
   SymbolCollectorTests.cpp
+  SymbolInfoTests.cpp
   SyncAPI.cpp
   TUSchedulerTests.cpp
   TestFS.cpp
@@ -40,8 +46,11 @@ add_extra_unittest(ClangdTests
   TestTU.cpp
   ThreadingTests.cpp
   TraceTests.cpp
+  TweakTests.cpp
   URITests.cpp
   XRefsTests.cpp
+
+  $<TARGET_OBJECTS:obj.clangDaemonTweaks>
   )
 
 target_link_libraries(ClangdTests
@@ -54,9 +63,15 @@ target_link_libraries(ClangdTests
   clangIndex
   clangLex
   clangSema
+  clangSerialization
+  clangTidy
   clangTooling
   clangToolingCore
   clangToolingInclusions
   LLVMSupport
   LLVMTestingSupport
   )
+
+if (CLANGD_BUILD_XPC)
+  add_subdirectory(xpc)
+endif ()

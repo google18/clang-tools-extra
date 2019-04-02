@@ -1,9 +1,8 @@
 //===--- UseAfterMoveCheck.cpp - clang-tidy -------------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -207,7 +206,7 @@ void UseAfterMoveFinder::getUsesAndReinits(
 }
 
 bool isStandardSmartPointer(const ValueDecl *VD) {
-  const Type *TheType = VD->getType().getTypePtrOrNull();
+  const Type *TheType = VD->getType().getNonReferenceType().getTypePtrOrNull();
   if (!TheType)
     return false;
 
@@ -298,7 +297,7 @@ void UseAfterMoveFinder::getReinits(
                declStmt(hasDescendant(equalsNode(MovedVariable))),
                // clear() and assign() on standard containers.
                cxxMemberCallExpr(
-                   on(allOf(DeclRefMatcher, StandardContainerTypeMatcher)),
+                   on(expr(DeclRefMatcher, StandardContainerTypeMatcher)),
                    // To keep the matcher simple, we check for assign() calls
                    // on all standard containers, even though only vector,
                    // deque, forward_list and list have assign(). If assign()
@@ -307,7 +306,7 @@ void UseAfterMoveFinder::getReinits(
                    callee(cxxMethodDecl(hasAnyName("clear", "assign")))),
                // reset() on standard smart pointers.
                cxxMemberCallExpr(
-                   on(allOf(DeclRefMatcher, StandardSmartPointerTypeMatcher)),
+                   on(expr(DeclRefMatcher, StandardSmartPointerTypeMatcher)),
                    callee(cxxMethodDecl(hasName("reset")))),
                // Methods that have the [[clang::reinitializes]] attribute.
                cxxMemberCallExpr(

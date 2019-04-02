@@ -1,9 +1,8 @@
 //===--- StringIntegerAssignmentCheck.cpp - clang-tidy---------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -28,10 +27,15 @@ void StringIntegerAssignmentCheck::registerMatchers(MatchFinder *Finder) {
           callee(cxxMethodDecl(ofClass(classTemplateSpecializationDecl(
               hasName("::std::basic_string"),
               hasTemplateArgument(0, refersToType(qualType().bind("type"))))))),
-          hasArgument(1,
-                      ignoringImpCasts(expr(hasType(isInteger()),
-                                            unless(hasType(isAnyCharacter())))
-                                           .bind("expr"))),
+          hasArgument(
+              1,
+              ignoringImpCasts(
+                  expr(hasType(isInteger()), unless(hasType(isAnyCharacter())),
+                       // Ignore calls to tolower/toupper (see PR27723).
+                       unless(callExpr(callee(functionDecl(
+                           hasAnyName("tolower", "std::tolower", "toupper",
+                                      "std::toupper"))))))
+                      .bind("expr"))),
           unless(isInTemplateInstantiation())),
       this);
 }

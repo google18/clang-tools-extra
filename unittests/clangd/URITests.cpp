@@ -1,18 +1,17 @@
 //===-- URITests.cpp  ---------------------------------*- C++ -*-----------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
+#include "Matchers.h"
 #include "TestFS.h"
 #include "URI.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using namespace llvm;
 namespace clang {
 namespace clangd {
 
@@ -28,14 +27,15 @@ MATCHER_P(Scheme, S, "") { return arg.scheme() == S; }
 MATCHER_P(Authority, A, "") { return arg.authority() == A; }
 MATCHER_P(Body, B, "") { return arg.body() == B; }
 
-std::string createOrDie(StringRef AbsolutePath, StringRef Scheme = "file") {
+std::string createOrDie(llvm::StringRef AbsolutePath,
+                        llvm::StringRef Scheme = "file") {
   auto Uri = URI::create(AbsolutePath, Scheme);
   if (!Uri)
     llvm_unreachable(toString(Uri.takeError()).c_str());
   return Uri->toString();
 }
 
-URI parseOrDie(StringRef Uri) {
+URI parseOrDie(llvm::StringRef Uri) {
   auto U = URI::parse(Uri);
   if (!U)
     llvm_unreachable(toString(U.takeError()).c_str());
@@ -60,7 +60,7 @@ TEST(PercentEncodingTest, Decode) {
   EXPECT_EQ(parseOrDie("x:a:b%3bc").body(), "a:b;c");
 }
 
-std::string resolveOrDie(const URI &U, StringRef HintPath = "") {
+std::string resolveOrDie(const URI &U, llvm::StringRef HintPath = "") {
   auto Path = URI::resolve(U, HintPath);
   if (!Path)
     llvm_unreachable(toString(Path.takeError()).c_str());
@@ -77,16 +77,9 @@ TEST(URITest, Create) {
 }
 
 TEST(URITest, FailedCreate) {
-  auto Fail = [](Expected<URI> U) {
-    if (!U) {
-      consumeError(U.takeError());
-      return true;
-    }
-    return false;
-  };
-  EXPECT_TRUE(Fail(URI::create("/x/y/z", "no")));
+  EXPECT_ERROR(URI::create("/x/y/z", "no"));
   // Path has to be absolute.
-  EXPECT_TRUE(Fail(URI::create("x/y/z", "file")));
+  EXPECT_ERROR(URI::create("x/y/z", "file"));
 }
 
 TEST(URITest, Parse) {
@@ -120,21 +113,12 @@ TEST(URITest, Parse) {
 }
 
 TEST(URITest, ParseFailed) {
-  auto FailedParse = [](StringRef U) {
-    auto URI = URI::parse(U);
-    if (!URI) {
-      consumeError(URI.takeError());
-      return true;
-    }
-    return false;
-  };
-
   // Expect ':' in URI.
-  EXPECT_TRUE(FailedParse("file//x/y/z"));
+  EXPECT_ERROR(URI::parse("file//x/y/z"));
   // Empty.
-  EXPECT_TRUE(FailedParse(""));
-  EXPECT_TRUE(FailedParse(":/a/b/c"));
-  EXPECT_TRUE(FailedParse("\"/a/b/c\" IWYU pragma: abc"));
+  EXPECT_ERROR(URI::parse(""));
+  EXPECT_ERROR(URI::parse(":/a/b/c"));
+  EXPECT_ERROR(URI::parse("\"/a/b/c\" IWYU pragma: abc"));
 }
 
 TEST(URITest, Resolve) {
@@ -150,6 +134,29 @@ TEST(URITest, Resolve) {
 #endif
   EXPECT_EQ(resolveOrDie(parseOrDie("unittest:///a"), testPath("x")),
             testPath("a"));
+}
+
+std::string resolvePathOrDie(llvm::StringRef AbsPath,
+                             llvm::StringRef HintPath = "") {
+  auto Path = URI::resolvePath(AbsPath, HintPath);
+  if (!Path)
+    llvm_unreachable(toString(Path.takeError()).c_str());
+  return *Path;
+}
+
+TEST(URITest, ResolvePath) {
+  StringRef FilePath =
+#ifdef _WIN32
+      "c:\\x\\y\\z";
+#else
+      "/a/b/c";
+#endif
+  EXPECT_EQ(resolvePathOrDie(FilePath), FilePath);
+  EXPECT_EQ(resolvePathOrDie(testPath("x"), testPath("hint")), testPath("x"));
+  // HintPath is not in testRoot(); resolution fails.
+  auto Resolve = URI::resolvePath(testPath("x"), FilePath);
+  EXPECT_FALSE(Resolve);
+  llvm::consumeError(Resolve.takeError());
 }
 
 TEST(URITest, Platform) {

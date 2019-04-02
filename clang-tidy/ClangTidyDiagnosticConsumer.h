@@ -1,9 +1,8 @@
 //===--- ClangTidyDiagnosticConsumer.h - clang-tidy -------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -102,6 +101,12 @@ public:
   /// \brief Initializes \c ClangTidyContext instance.
   ClangTidyContext(std::unique_ptr<ClangTidyOptionsProvider> OptionsProvider,
                    bool AllowEnablingAnalyzerAlphaCheckers = false);
+  /// Sets the DiagnosticsEngine that diag() will emit diagnostics to.
+  // FIXME: this is required initialization, and should be a constructor param.
+  // Fix the context -> diag engine -> consumer -> context initialization cycle.
+  void setDiagnosticsEngine(DiagnosticsEngine *DiagEngine) {
+    this->DiagEngine = DiagEngine;
+  }
 
   ~ClangTidyContext();
 
@@ -186,9 +191,8 @@ public:
   }
 
 private:
-  // Sets DiagEngine and Errors.
+  // Writes to Stats.
   friend class ClangTidyDiagnosticConsumer;
-  friend class ClangTidyPluginAction;
 
   DiagnosticsEngine *DiagEngine;
   std::unique_ptr<ClangTidyOptionsProvider> OptionsProvider;
@@ -242,12 +246,11 @@ private:
 
   /// \brief Updates \c LastErrorRelatesToUserCode and LastErrorPassesLineFilter
   /// according to the diagnostic \p Location.
-  void checkFilters(SourceLocation Location);
+  void checkFilters(SourceLocation Location, const SourceManager& Sources);
   bool passesLineFilter(StringRef FileName, unsigned LineNumber) const;
 
   ClangTidyContext &Context;
   bool RemoveIncompatibleErrors;
-  std::unique_ptr<DiagnosticsEngine> Diags;
   std::vector<ClangTidyError> Errors;
   std::unique_ptr<llvm::Regex> HeaderFilter;
   bool LastErrorRelatesToUserCode;

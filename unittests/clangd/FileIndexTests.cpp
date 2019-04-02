@@ -1,9 +1,8 @@
 //===-- FileIndexTests.cpp  ---------------------------*- C++ -*-----------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -13,7 +12,9 @@
 #include "SyncAPI.h"
 #include "TestFS.h"
 #include "TestTU.h"
+#include "index/CanonicalIncludes.h"
 #include "index/FileIndex.h"
+#include "index/Index.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/PCHContainerOperations.h"
 #include "clang/Frontend/Utils.h"
@@ -37,11 +38,15 @@ MATCHER_P(RefRange, Range, "") {
          std::make_tuple(Range.start.line, Range.start.character,
                          Range.end.line, Range.end.character);
 }
-MATCHER_P(FileURI, F, "") { return arg.Location.FileURI == F; }
-MATCHER_P(DeclURI, U, "") { return arg.CanonicalDeclaration.FileURI == U; }
+MATCHER_P(FileURI, F, "") { return llvm::StringRef(arg.Location.FileURI) == F; }
+MATCHER_P(DeclURI, U, "") {
+  return llvm::StringRef(arg.CanonicalDeclaration.FileURI) == U;
+}
+MATCHER_P(DefURI, U, "") {
+  return llvm::StringRef(arg.Definition.FileURI) == U;
+}
 MATCHER_P(QName, N, "") { return (arg.Scope + arg.Name).str() == N; }
 
-using namespace llvm;
 namespace clang {
 namespace clangd {
 namespace {
@@ -50,7 +55,7 @@ RefsAre(std::vector<testing::Matcher<Ref>> Matchers) {
   return ElementsAre(testing::Pair(_, UnorderedElementsAreArray(Matchers)));
 }
 
-Symbol symbol(StringRef ID) {
+Symbol symbol(llvm::StringRef ID) {
   Symbol Sym;
   Sym.ID = SymbolID(ID);
   Sym.Name = ID;
@@ -64,21 +69,13 @@ std::unique_ptr<SymbolSlab> numSlab(int Begin, int End) {
   return llvm::make_unique<SymbolSlab>(std::move(Slab).build());
 }
 
-std::unique_ptr<RefSlab> refSlab(const SymbolID &ID, StringRef Path) {
+std::unique_ptr<RefSlab> refSlab(const SymbolID &ID, const char *Path) {
   RefSlab::Builder Slab;
   Ref R;
   R.Location.FileURI = Path;
   R.Kind = RefKind::Reference;
   Slab.insert(ID, R);
   return llvm::make_unique<RefSlab>(std::move(Slab).build());
-}
-
-RefSlab getRefs(const SymbolIndex &I, SymbolID ID) {
-  RefsRequest Req;
-  Req.IDs = {ID};
-  RefSlab::Builder Slab;
-  I.refs(Req, [&](const Ref &S) { Slab.insert(ID, S); });
-  return std::move(Slab).build();
 }
 
 TEST(FileSymbolsTest, UpdateAndGet) {
@@ -100,6 +97,27 @@ TEST(FileSymbolsTest, Overlap) {
     EXPECT_THAT(runFuzzyFind(*FS.buildIndex(Type), ""),
                 UnorderedElementsAre(QName("1"), QName("2"), QName("3"),
                                      QName("4"), QName("5")));
+}
+
+TEST(FileSymbolsTest, MergeOverlap) {
+  FileSymbols FS;
+  auto OneSymboSlab = [](Symbol Sym) {
+    SymbolSlab::Builder S;
+    S.insert(Sym);
+    return llvm::make_unique<SymbolSlab>(std::move(S).build());
+  };
+  auto X1 = symbol("x");
+  X1.CanonicalDeclaration.FileURI = "file:///x1";
+  auto X2 = symbol("x");
+  X2.Definition.FileURI = "file:///x2";
+
+  FS.update("f1", OneSymboSlab(X1), nullptr);
+  FS.update("f2", OneSymboSlab(X2), nullptr);
+  for (auto Type : {IndexType::Light, IndexType::Heavy})
+    EXPECT_THAT(
+        runFuzzyFind(*FS.buildIndex(Type, DuplicateHandling::Merge), "x"),
+        UnorderedElementsAre(
+            AllOf(QName("x"), DeclURI("file:///x1"), DefURI("file:///x2"))));
 }
 
 TEST(FileSymbolsTest, SnapshotAliveAfterRemove) {
@@ -124,18 +142,18 @@ TEST(FileSymbolsTest, SnapshotAliveAfterRemove) {
 }
 
 // Adds Basename.cpp, which includes Basename.h, which contains Code.
-void update(FileIndex &M, StringRef Basename, StringRef Code) {
+void update(FileIndex &M, llvm::StringRef Basename, llvm::StringRef Code) {
   TestTU File;
   File.Filename = (Basename + ".cpp").str();
   File.HeaderFilename = (Basename + ".h").str();
   File.HeaderCode = Code;
   auto AST = File.build();
-  M.updatePreamble(File.Filename, AST.getASTContext(),
-                   AST.getPreprocessorPtr());
+  M.updatePreamble(File.Filename, AST.getASTContext(), AST.getPreprocessorPtr(),
+                   AST.getCanonicalIncludes());
 }
 
 TEST(FileIndexTest, CustomizedURIScheme) {
-  FileIndex M({"unittest"});
+  FileIndex M;
   update(M, "f", "class string {};");
 
   EXPECT_THAT(runFuzzyFind(M, ""), ElementsAre(DeclURI("unittest:///f.h")));
@@ -182,13 +200,49 @@ TEST(FileIndexTest, ClassMembers) {
                                    QName("X::f")));
 }
 
-TEST(FileIndexTest, NoIncludeCollected) {
+TEST(FileIndexTest, IncludeCollected) {
   FileIndex M;
-  update(M, "f", "class string {};");
+  update(
+      M, "f",
+      "// IWYU pragma: private, include <the/good/header.h>\nclass string {};");
 
   auto Symbols = runFuzzyFind(M, "");
   EXPECT_THAT(Symbols, ElementsAre(_));
-  EXPECT_THAT(Symbols.begin()->IncludeHeaders, IsEmpty());
+  EXPECT_THAT(Symbols.begin()->IncludeHeaders.front().IncludeHeader,
+              "<the/good/header.h>");
+}
+
+TEST(FileIndexTest, HasSystemHeaderMappingsInPreamble) {
+  FileIndex Index;
+  const std::string Header = R"cpp(
+    class Foo {};
+  )cpp";
+  auto MainFile = testPath("foo.cpp");
+  auto HeaderFile = testPath("algorithm");
+  std::vector<const char *> Cmd = {"clang", "-xc++", MainFile.c_str(),
+                                   "-include", HeaderFile.c_str()};
+  // Preparse ParseInputs.
+  ParseInputs PI;
+  PI.CompileCommand.Directory = testRoot();
+  PI.CompileCommand.Filename = MainFile;
+  PI.CompileCommand.CommandLine = {Cmd.begin(), Cmd.end()};
+  PI.Contents = "";
+  PI.FS = buildTestFS({{MainFile, ""}, {HeaderFile, Header}});
+
+  // Prepare preamble.
+  auto CI = buildCompilerInvocation(PI);
+  auto PreambleData = buildPreamble(
+      MainFile, *buildCompilerInvocation(PI), /*OldPreamble=*/nullptr,
+      tooling::CompileCommand(), PI, std::make_shared<PCHContainerOperations>(),
+      /*StoreInMemory=*/true,
+      [&](ASTContext &Ctx, std::shared_ptr<Preprocessor> PP,
+          const CanonicalIncludes &Includes) {
+        Index.updatePreamble(MainFile, Ctx, PP, Includes);
+      });
+  auto Symbols = runFuzzyFind(Index, "");
+  EXPECT_THAT(Symbols, ElementsAre(_));
+  EXPECT_THAT(Symbols.begin()->IncludeHeaders.front().IncludeHeader,
+              "<algorithm>");
 }
 
 TEST(FileIndexTest, TemplateParamsInLabel) {
@@ -229,7 +283,7 @@ TEST(FileIndexTest, RebuildWithPreamble) {
   PI.CompileCommand.Filename = FooCpp;
   PI.CompileCommand.CommandLine = {"clang", "-xc++", FooCpp};
 
-  StringMap<std::string> Files;
+  llvm::StringMap<std::string> Files;
   Files[FooCpp] = "";
   Files[FooH] = R"cpp(
     namespace ns_in_header {
@@ -253,10 +307,11 @@ TEST(FileIndexTest, RebuildWithPreamble) {
   buildPreamble(
       FooCpp, *CI, /*OldPreamble=*/nullptr, tooling::CompileCommand(), PI,
       std::make_shared<PCHContainerOperations>(), /*StoreInMemory=*/true,
-      [&](ASTContext &Ctx, std::shared_ptr<Preprocessor> PP) {
+      [&](ASTContext &Ctx, std::shared_ptr<Preprocessor> PP,
+          const CanonicalIncludes &CanonIncludes) {
         EXPECT_FALSE(IndexUpdated) << "Expected only a single index update";
         IndexUpdated = true;
-        Index.updatePreamble(FooCpp, Ctx, std::move(PP));
+        Index.updatePreamble(FooCpp, Ctx, std::move(PP), CanonIncludes);
       });
   ASSERT_TRUE(IndexUpdated);
 
@@ -285,7 +340,7 @@ TEST(FileIndexTest, Refs) {
   RefsRequest Request;
   Request.IDs = {Foo.ID};
 
-  FileIndex Index(/*URISchemes*/ {"unittest"});
+  FileIndex Index;
   // Add test.cc
   TestTU Test;
   Test.HeaderCode = HeaderCode;
@@ -326,7 +381,7 @@ TEST(FileIndexTest, ReferencesInMainFileWithPreamble) {
   )cpp");
   auto MainFile = testPath("foo.cpp");
   auto HeaderFile = testPath("foo.h");
-  std::vector<const char*> Cmd = {"clang", "-xc++", MainFile.c_str()};
+  std::vector<const char *> Cmd = {"clang", "-xc++", MainFile.c_str()};
   // Preparse ParseInputs.
   ParseInputs PI;
   PI.CompileCommand.Directory = testRoot();
@@ -338,22 +393,22 @@ TEST(FileIndexTest, ReferencesInMainFileWithPreamble) {
   // Prepare preamble.
   auto CI = buildCompilerInvocation(PI);
   auto PreambleData = buildPreamble(
-      MainFile,
-      *buildCompilerInvocation(PI), /*OldPreamble=*/nullptr,
-      tooling::CompileCommand(), PI,
-      std::make_shared<PCHContainerOperations>(), /*StoreInMemory=*/true,
-      [&](ASTContext &Ctx, std::shared_ptr<Preprocessor> PP) {});
+      MainFile, *buildCompilerInvocation(PI), /*OldPreamble=*/nullptr,
+      tooling::CompileCommand(), PI, std::make_shared<PCHContainerOperations>(),
+      /*StoreInMemory=*/true,
+      [&](ASTContext &Ctx, std::shared_ptr<Preprocessor> PP,
+          const CanonicalIncludes &) {});
   // Build AST for main file with preamble.
   auto AST =
       ParsedAST::build(createInvocationFromCommandLine(Cmd), PreambleData,
-                       MemoryBuffer::getMemBufferCopy(Main.code()),
-                       std::make_shared<PCHContainerOperations>(), PI.FS);
+                       llvm::MemoryBuffer::getMemBufferCopy(Main.code()),
+                       std::make_shared<PCHContainerOperations>(), PI.FS,
+                       /*Index=*/nullptr, ParseOptions());
   ASSERT_TRUE(AST);
   FileIndex Index;
   Index.updateMain(MainFile, *AST);
 
-  auto Foo =
-      findSymbol(TestTU::withHeaderCode(Header).headerSymbols(), "Foo");
+  auto Foo = findSymbol(TestTU::withHeaderCode(Header).headerSymbols(), "Foo");
   RefsRequest Request;
   Request.IDs.insert(Foo.ID);
 

@@ -1,9 +1,8 @@
 //===--- Quality.h - Ranking alternatives for ambiguous queries --*- C++-*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -28,6 +27,7 @@
 #ifndef LLVM_CLANG_TOOLS_EXTRA_CLANGD_QUALITY_H
 #define LLVM_CLANG_TOOLS_EXTRA_CLANGD_QUALITY_H
 
+#include "ExpectedTypes.h"
 #include "FileDistance.h"
 #include "clang/Sema/CodeCompleteConsumer.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -67,8 +67,10 @@ struct SymbolQualitySignals {
     Type,
     Function,
     Constructor,
+    Destructor,
     Namespace,
     Keyword,
+    Operator,
   } Category = Unknown;
 
   void merge(const CodeCompletionResult &SemaCCResult);
@@ -121,6 +123,13 @@ struct SymbolRelevanceSignals {
 
   // Whether symbol is an instance member of a class.
   bool IsInstanceMember = false;
+
+  // Whether clang provided a preferred type in the completion context.
+  bool HadContextType = false;
+  // Whether a source completion item or a symbol had a type information.
+  bool HadSymbolType = false;
+  // Whether the item matches the type expected in the completion context.
+  bool TypeMatchesPreferred = false;
 
   void merge(const CodeCompletionResult &SemaResult);
   void merge(const Symbol &IndexResult);
