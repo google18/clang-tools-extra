@@ -9,6 +9,7 @@
 #include "UseAutoForRangeCheck.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
+#include <string>
 
 using namespace clang::ast_matchers;
 
@@ -18,16 +19,20 @@ namespace modernize {
 
 void UseAutoForRangeCheck::registerMatchers(MatchFinder *Finder) {
   Finder->addMatcher(
-      cxxForRangeStmt(hasLoopVariable(varDecl())).bind("loopInit"), this);
+      cxxForRangeStmt(has(varDecl())).bind("loopInit"), this);
 }
 
 void UseAutoForRangeCheck::check(const MatchFinder::MatchResult &Result) {
-  const auto *MatchedDecl = Result.Nodes.getNodeAs<CXXForRangeStmt>("loopInit");
-  if (MatchedDecl->getName().startswith("awesome_"))
-    return;
-  diag(MatchedDecl->getLocation(), "function %0 is insufficiently awesome")
-      << MatchedDecl
-      << FixItHint::CreateInsertion(MatchedDecl->getLocation(), "awesome_");
+  const SourceManager *SM = Result.SourceManager;
+  const auto *VarDec = Result.Nodes.getNodeAs<VarDecl>("loopInit");
+  if(VarDec){
+    std::string DiagText = "TODO";
+    llvm::StringRef ObjName = Lexer::getSourceText(CharSourceRange::getCharRange(VarDec->getSourceRange()), *SM, LangOptions());
+    std::string NewText = ObjName.str();
+    llvm::outs() << NewText << "\n"; 
+  
+  }
+  
 }
 
 } // namespace modernize
