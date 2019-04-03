@@ -13,7 +13,7 @@ that returns a ``std::unqiue_ptr<T>`` then recommends using
     static A* NewA() { return new A(); }
 
   private:
-    A() {}
+    A() = default; 
   };
 
   std::unique_ptr<A> a;
