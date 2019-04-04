@@ -1,33 +1,37 @@
 // RUN: %check_clang_tidy %s abseil-safely-scoped %t
 namespace bar {
 
-class something {};
+class A {};
+class B {};
 } // namespace bar
 
-namespace foo {
+namespace foo1 {
 
-using bar::something;
+using bar::A;
+void f(A a);
 
 namespace {} // anonymous namespace
-} // namespace foo
-// CHECK-MESSAGES: :[[@LINE-4]]:12: warning: using declaration 'something' not
+} // namespace foo1
+// CHECK-MESSAGES: :[[@LINE-4]]:12: warning: using declaration 'A' not
 // declared in the innermost namespace. [abseil-safely-scoped]
 
-namespace foo {
+namespace foo2 {
 
 namespace {
 
-using ::bar::something;
+using ::bar::B;
 
 } // anonymous namespace
-} // namespace foo
+void g(B b);
+} // namespace foo2
+
 
 // Check should not be triggered below when we are at 
 // function (instead of namespace) scope.
 namespace outer {
 
   int fun_scope() {
-    using ::bar::something;
+    using ::bar::A;
     return 0;
   } // function scope
   

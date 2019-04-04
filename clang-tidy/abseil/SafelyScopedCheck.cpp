@@ -23,9 +23,9 @@ void SafelyScopedCheck::registerMatchers(MatchFinder *Finder) {
   // 2. in some namespace declaration but not in the innermost layer
   Finder->addMatcher(
       usingDecl(
-          eachOf(usingDecl(unless(hasAncestor(functionDecl()))),
+          eachOf(allOf(usingDecl(unless(hasAncestor(functionDecl()))),
                  usingDecl(unless(hasAncestor(cxxRecordDecl()))),
-                 usingDecl(unless(hasAncestor(namespaceDecl()))),
+                 usingDecl(unless(hasAncestor(namespaceDecl())))),
                  usingDecl(hasParent(namespaceDecl(forEach(namespaceDecl()))))))
           .bind("use"),
       this);
