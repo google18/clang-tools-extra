@@ -24,7 +24,8 @@ constexpr char ConstructorCall[] = "constructorCall";
 constexpr char ResetCall[] = "resetCall";
 constexpr char NewExpression[] = "newExpression";
 
-std::string GetNewExprName(const CXXNewExpr *NewExpr, const SourceManager &SM,
+std::string GetNewExprName(const CXXNewExpr *NewExpr,
+                           const SourceManager &SM,
                            const LangOptions &Lang) {
   StringRef WrittenName = Lexer::getSourceText(
       CharSourceRange::getTokenRange(
@@ -54,7 +55,8 @@ AST_POLYMORPHIC_MATCHER_P(boolean, AST_POLYMORPHIC_SUPPORTED_TYPES(Stmt, Decl),
 
 const char MakeSmartPtrCheck::PointerType[] = "pointerType";
 
-MakeSmartPtrCheck::MakeSmartPtrCheck(StringRef Name, ClangTidyContext *Context,
+MakeSmartPtrCheck::MakeSmartPtrCheck(StringRef Name,
+                                     ClangTidyContext *Context,
                                      StringRef MakeSmartPtrFunctionName)
     : ClangTidyCheck(Name, Context),
       IncludeStyle(utils::IncludeSorter::parseIncludeStyle(
@@ -198,7 +200,8 @@ void MakeSmartPtrCheck::checkConstruct(SourceManager &SM, ASTContext *Ctx,
     // we have to add it back.
     ConstructCallEnd = ConstructCallStart.getLocWithOffset(ExprStr.size());
     Diag << FixItHint::CreateInsertion(
-        ConstructCallEnd, "<" + GetNewExprName(New, SM, getLangOpts()) + ">");
+        ConstructCallEnd,
+        "<" + GetNewExprName(New, SM, getLangOpts()) + ">");
   } else {
     ConstructCallEnd = ConstructCallStart.getLocWithOffset(LAngle);
   }
@@ -296,7 +299,7 @@ bool MakeSmartPtrCheck::replaceNew(DiagnosticBuilder &Diag,
     return false;
 
   std::string ArraySizeExpr;
-  if (const auto *ArraySize = New->getArraySize()) {
+  if (const auto* ArraySize = New->getArraySize()) {
     ArraySizeExpr = Lexer::getSourceText(CharSourceRange::getTokenRange(
                                              ArraySize->getSourceRange()),
                                          SM, getLangOpts())
@@ -362,7 +365,8 @@ bool MakeSmartPtrCheck::replaceNew(DiagnosticBuilder &Diag,
       Diag << FixItHint::CreateRemoval(
           SourceRange(NewStart, InitRange.getBegin()));
       Diag << FixItHint::CreateRemoval(SourceRange(InitRange.getEnd(), NewEnd));
-    } else {
+    } 
+    else {
       // New array expression with default/value initialization:
       //   smart_ptr<Foo[]>(new int[5]());
       //   smart_ptr<Foo[]>(new Foo[5]());
