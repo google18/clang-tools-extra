@@ -111,7 +111,8 @@ Improvements to clang-tidy
 
 - The :doc:`modernize-make-unique
   <clang-tidy/checks/modernize-make-unique>` now supports an
-  `IgnoreListInit` option.
+  `IgnoreListInit` option which disables the check when the constructor
+  is a list initialization.
 
 - The `Acronyms` and `IncludeDefaultAcronyms` options for the
   :doc:`objc-property-declaration <clang-tidy/checks/objc-property-declaration>`
