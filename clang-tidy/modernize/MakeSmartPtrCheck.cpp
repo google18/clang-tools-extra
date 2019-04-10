@@ -178,11 +178,6 @@ void MakeSmartPtrCheck::checkConstruct(SourceManager &SM, ASTContext *Ctx,
   if (Invalid)
     return;
 
-  // Disable the fix for list initializations.
-  if (IgnoreListInit && New->getInitializationStyle() == CXXNewExpr::ListInit) {
-    return;
-  }
-
   auto Diag = diag(ConstructCallStart, "use %0 instead")
               << MakeSmartPtrFunctionName;
 
@@ -249,11 +244,6 @@ void MakeSmartPtrCheck::checkReset(SourceManager &SM, ASTContext *Ctx,
   // "reset" expression, e.g. call "reset()" method directly in the subclass of
   // "std::unique_ptr<>". We skip these cases.
   if (OperatorLoc.isInvalid()) {
-    return;
-  }
-
-  // Disable the fix for list initializations.
-  if (IgnoreListInit && New->getInitializationStyle() == CXXNewExpr::ListInit) {
     return;
   }
 
