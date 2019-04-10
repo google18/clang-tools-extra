@@ -56,7 +56,7 @@ AST_POLYMORPHIC_MATCHER_P(boolean, AST_POLYMORPHIC_SUPPORTED_TYPES(Stmt, Decl),
 const char MakeSmartPtrCheck::PointerType[] = "pointerType";
 
 MakeSmartPtrCheck::MakeSmartPtrCheck(StringRef Name,
-                                     ClangTidyContext *Context,
+                                     ClangTidyContext* Context,
                                      StringRef MakeSmartPtrFunctionName)
     : ClangTidyCheck(Name, Context),
       IncludeStyle(utils::IncludeSorter::parseIncludeStyle(
