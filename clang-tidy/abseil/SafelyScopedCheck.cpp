@@ -19,13 +19,13 @@ namespace abseil {
 
 void SafelyScopedCheck::registerMatchers(MatchFinder *Finder) {
   // The target using declaration is either:
-  // 1. not in any namespace declaration, or
+  // 1. not in any scope, or
   // 2. in some namespace declaration but not in the innermost layer
   Finder->addMatcher(
       usingDecl(
           eachOf(allOf(usingDecl(unless(hasAncestor(functionDecl()))),
-                 usingDecl(unless(hasAncestor(cxxRecordDecl()))),
-                 usingDecl(unless(hasAncestor(namespaceDecl())))),
+                       usingDecl(unless(hasAncestor(cxxRecordDecl()))),
+                       usingDecl(unless(hasAncestor(namespaceDecl())))),
                  usingDecl(hasParent(namespaceDecl(forEach(namespaceDecl()))))))
           .bind("use"),
       this);
