@@ -82,11 +82,11 @@ void WrapUniqueCheck::check(const MatchFinder::MatchResult &Result) {
                                       Cons->getParenOrBraceRange().getBegin()),
         *SM, LangOptions());
 
-    std::string Left = (ConsDecl) ? "auto " + NameRef.str() + " = " : "";
+    std::string Left = ConsDecl ? "auto " + NameRef.str() + " = " : "";
     std::string NewText =
         Left + "absl::WrapUnique(" + getArgs(SM, FcCall) + ")";
     SourceLocation Target =
-        (ConsDecl) ? ConsDecl->getBeginLoc() : Cons->getExprLoc();
+        ConsDecl ? ConsDecl->getBeginLoc() : Cons->getExprLoc();
 
     diag(Target, DiagText) << FixItHint::CreateReplacement(
         CharSourceRange::getTokenRange(Target, Cons->getEndLoc()), NewText);
