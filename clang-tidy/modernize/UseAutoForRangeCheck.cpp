@@ -19,20 +19,23 @@ namespace modernize {
 
 void UseAutoForRangeCheck::registerMatchers(MatchFinder *Finder) {
   Finder->addMatcher(
-      cxxForRangeStmt(has(varDecl())).bind("loopInit"), this);
+      cxxForRangeStmt(hasLoopVariable(varDecl())).bind("loopInit"), this);
 }
 
 void UseAutoForRangeCheck::check(const MatchFinder::MatchResult &Result) {
   const SourceManager *SM = Result.SourceManager;
   const auto *VarDec = Result.Nodes.getNodeAs<VarDecl>("loopInit");
-  if(VarDec){
-    std::string DiagText = "TODO";
-    llvm::StringRef ObjName = Lexer::getSourceText(CharSourceRange::getCharRange(VarDec->getSourceRange()), *SM, LangOptions());
+  llvm::outs()<< "test\n";
+  
+  if (VarDec) {
+    std::string DiagText = "Prefer auto in range based loop variable";
+    llvm::StringRef ObjName = Lexer::getSourceText(
+        CharSourceRange::getCharRange(VarDec->getSourceRange()), *SM,
+        LangOptions());
     std::string NewText = ObjName.str();
-    llvm::outs() << NewText << "\n"; 
-  
+    SourceLocation Target = VarDec->getBeginLoc();
+    diag(Target, DiagText) << FixItHint::CreateReplacement(CharSourceRange::getTokenRange(Target, VarDec->getEndLoc()), NewText);
   }
-  
 }
 
 } // namespace modernize
