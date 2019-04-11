@@ -24,17 +24,17 @@ void UseAutoForRangeCheck::registerMatchers(MatchFinder *Finder) {
 
 void UseAutoForRangeCheck::check(const MatchFinder::MatchResult &Result) {
   const SourceManager *SM = Result.SourceManager;
-  const auto *VarDec = Result.Nodes.getNodeAs<VarDecl>("loopInit");
+  const auto *RangeLoop = Result.Nodes.getNodeAs<cxxForRangeStmt>("loopInit");
   llvm::outs()<< "test\n";
   
-  if (VarDec) {
+  if (RangeLoop) {
     std::string DiagText = "Prefer auto in range based loop variable";
     llvm::StringRef ObjName = Lexer::getSourceText(
-        CharSourceRange::getCharRange(VarDec->getSourceRange()), *SM,
+        CharSourceRange::getCharRange(RangeLoop->getSourceRange()), *SM,
         LangOptions());
     std::string NewText = ObjName.str();
-    SourceLocation Target = VarDec->getBeginLoc();
-    diag(Target, DiagText) << FixItHint::CreateReplacement(CharSourceRange::getTokenRange(Target, VarDec->getEndLoc()), NewText);
+    SourceLocation Target = RangeLoop->getBeginLoc();
+    diag(Target, DiagText) << FixItHint::CreateReplacement(CharSourceRange::getTokenRange(Target, RangeLoop->getEndLoc()), NewText);
   }
 }
 
