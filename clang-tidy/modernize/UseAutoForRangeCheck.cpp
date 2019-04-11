@@ -18,23 +18,25 @@ namespace tidy {
 namespace modernize {
 
 void UseAutoForRangeCheck::registerMatchers(MatchFinder *Finder) {
-  Finder->addMatcher(
-      cxxForRangeStmt(hasLoopVariable(varDecl())).bind("loopInit"), this);
+  Finder->addMatcher(cxxForRangeStmt(hasLoopVariable(varDecl().bind("LoopVar")))
+                         .bind("loopInit"),
+                     this);
 }
 
 void UseAutoForRangeCheck::check(const MatchFinder::MatchResult &Result) {
-  const SourceManager *SM = Result.SourceManager;
-  const auto *RangeLoop = Result.Nodes.getNodeAs<cxxForRangeStmt>("loopInit");
-  llvm::outs()<< "test\n";
-  
+  const auto *RangeLoop = Result.Nodes.getNodeAs<CXXForRangeStmt>("loopInit");
+  llvm::outs() << "test\n";
+
   if (RangeLoop) {
-    std::string DiagText = "Prefer auto in range based loop variable";
-    llvm::StringRef ObjName = Lexer::getSourceText(
-        CharSourceRange::getCharRange(RangeLoop->getSourceRange()), *SM,
-        LangOptions());
-    std::string NewText = ObjName.str();
-    SourceLocation Target = RangeLoop->getBeginLoc();
-    diag(Target, DiagText) << FixItHint::CreateReplacement(CharSourceRange::getTokenRange(Target, RangeLoop->getEndLoc()), NewText);
+    const auto *LoopVar = Result.Nodes.getNodeAs<VarDecl>("LoopVar");
+    if (LoopVar) {
+      std::string DiagText = "Prefer auto in range based loop variable";
+      std::string NewText = "auto " + LoopVar->getNameAsString();
+      SourceLocation Target = LoopVar->getBeginLoc();
+      diag(Target, DiagText) << FixItHint::CreateReplacement(
+          CharSourceRange::getTokenRange(Target, LoopVar->getEndLoc()),
+          NewText);
+    }
   }
 }
 
