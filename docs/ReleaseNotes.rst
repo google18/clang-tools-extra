@@ -75,7 +75,6 @@ Improvements to clang-tidy
 
 - New :doc:`abseil-duration-addition
   <clang-tidy/checks/abseil-duration-addition>` check.
->>>>>>> master
 
   Checks for cases where addition should be performed in the ``absl::Time``
   domain.
