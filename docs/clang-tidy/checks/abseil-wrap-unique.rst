@@ -3,6 +3,7 @@
 abseil-wrap-unique
 ==================
 Looks for instances of factory functions which uses a non-public constructor
+
 that returns a ``std::unqiue_ptr<T>`` then recommends using  ``absl::wrap_unique(new T(...))``.
 
 Examples:
