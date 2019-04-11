@@ -1,9 +1,8 @@
 //===-- SourceCodeTests.cpp  ------------------------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -30,7 +29,6 @@
 #include "gtest/gtest.h"
 #include <vector>
 
-using namespace llvm;
 namespace clang {
 namespace clangd {
 
@@ -50,10 +48,7 @@ TEST(QualityTests, SymbolQualitySignalExtraction) {
     #define DECL_NAME(x, y) x##_##y##_Decl
     #define DECL(x, y) class DECL_NAME(x, y) {};
     DECL(X, Y); // X_Y_Decl
-
-    class MAC {};
   )cpp");
-  Header.ExtraArgs = {"-DMAC=mac_name"};
 
   auto Symbols = Header.headerSymbols();
   auto AST = Header.build();
@@ -67,11 +62,6 @@ TEST(QualityTests, SymbolQualitySignalExtraction) {
   EXPECT_EQ(Quality.Category, SymbolQualitySignals::Variable);
 
   Quality.merge(findSymbol(Symbols, "X_Y_Decl"));
-  EXPECT_TRUE(Quality.ImplementationDetail);
-
-  Quality.ImplementationDetail = false;
-  Quality.merge(
-      CodeCompletionResult(&findDecl(AST, "mac_name"), /*Priority=*/42));
   EXPECT_TRUE(Quality.ImplementationDetail);
 
   Symbol F = findSymbol(Symbols, "_f");
@@ -148,17 +138,13 @@ TEST(QualityTests, SymbolRelevanceSignalExtraction) {
 
   auto constructShadowDeclCompletionResult = [&](const std::string DeclName) {
     auto *Shadow =
-        *dyn_cast<UsingDecl>(
-             &findAnyDecl(AST,
-                          [&](const NamedDecl &ND) {
-                            if (const UsingDecl *Using =
-                                    dyn_cast<UsingDecl>(&ND))
-                              if (Using->shadow_size() &&
-                                  Using->getQualifiedNameAsString() == DeclName)
-                                return true;
-                            return false;
-                          }))
-             ->shadow_begin();
+        *dyn_cast<UsingDecl>(&findDecl(AST, [&](const NamedDecl &ND) {
+           if (const UsingDecl *Using = dyn_cast<UsingDecl>(&ND))
+             if (Using->shadow_size() &&
+                 Using->getQualifiedNameAsString() == DeclName)
+               return true;
+           return false;
+         }))->shadow_begin();
     CodeCompletionResult Result(Shadow->getTargetDecl(), 42);
     Result.ShadowDecl = Shadow;
     return Result;
@@ -173,13 +159,13 @@ TEST(QualityTests, SymbolRelevanceSignalExtraction) {
       << "Using declaration in main file";
 
   Relevance = {};
-  Relevance.merge(CodeCompletionResult(&findAnyDecl(AST, "X"), 42));
+  Relevance.merge(CodeCompletionResult(&findUnqualifiedDecl(AST, "X"), 42));
   EXPECT_EQ(Relevance.Scope, SymbolRelevanceSignals::FileScope);
   Relevance = {};
-  Relevance.merge(CodeCompletionResult(&findAnyDecl(AST, "y"), 42));
+  Relevance.merge(CodeCompletionResult(&findUnqualifiedDecl(AST, "y"), 42));
   EXPECT_EQ(Relevance.Scope, SymbolRelevanceSignals::ClassScope);
   Relevance = {};
-  Relevance.merge(CodeCompletionResult(&findAnyDecl(AST, "z"), 42));
+  Relevance.merge(CodeCompletionResult(&findUnqualifiedDecl(AST, "z"), 42));
   EXPECT_EQ(Relevance.Scope, SymbolRelevanceSignals::FunctionScope);
   // The injected class name is treated as the outer class name.
   Relevance = {};
@@ -188,10 +174,23 @@ TEST(QualityTests, SymbolRelevanceSignalExtraction) {
 
   Relevance = {};
   EXPECT_FALSE(Relevance.InBaseClass);
-  auto BaseMember = CodeCompletionResult(&findAnyDecl(AST, "y"), 42);
+  auto BaseMember = CodeCompletionResult(&findUnqualifiedDecl(AST, "y"), 42);
   BaseMember.InBaseClass = true;
   Relevance.merge(BaseMember);
   EXPECT_TRUE(Relevance.InBaseClass);
+
+  auto Index = Test.index();
+  FuzzyFindRequest Req;
+  Req.Query = "X";
+  Req.AnyScope = true;
+  bool Matched = false;
+  Index->fuzzyFind(Req, [&](const Symbol &S) {
+    Matched = true;
+    Relevance = {};
+    Relevance.merge(S);
+    EXPECT_EQ(Relevance.Scope, SymbolRelevanceSignals::FileScope);
+  });
+  EXPECT_TRUE(Matched);
 }
 
 // Do the signals move the scores in the direction we expect?
@@ -217,16 +216,22 @@ TEST(QualityTests, SymbolQualitySignalsSanity) {
   EXPECT_GT(WithReferences.evaluate(), Default.evaluate());
   EXPECT_GT(ManyReferences.evaluate(), WithReferences.evaluate());
 
-  SymbolQualitySignals Keyword, Variable, Macro, Constructor, Function;
+  SymbolQualitySignals Keyword, Variable, Macro, Constructor, Function,
+      Destructor, Operator;
   Keyword.Category = SymbolQualitySignals::Keyword;
   Variable.Category = SymbolQualitySignals::Variable;
   Macro.Category = SymbolQualitySignals::Macro;
   Constructor.Category = SymbolQualitySignals::Constructor;
+  Destructor.Category = SymbolQualitySignals::Destructor;
+  Destructor.Category = SymbolQualitySignals::Destructor;
+  Operator.Category = SymbolQualitySignals::Operator;
   Function.Category = SymbolQualitySignals::Function;
   EXPECT_GT(Variable.evaluate(), Default.evaluate());
   EXPECT_GT(Keyword.evaluate(), Variable.evaluate());
   EXPECT_LT(Macro.evaluate(), Default.evaluate());
+  EXPECT_LT(Operator.evaluate(), Default.evaluate());
   EXPECT_LT(Constructor.evaluate(), Function.evaluate());
+  EXPECT_LT(Destructor.evaluate(), Constructor.evaluate());
 }
 
 TEST(QualityTests, SymbolRelevanceSignalsSanity) {
@@ -259,7 +264,7 @@ TEST(QualityTests, SymbolRelevanceSignalsSanity) {
 
   SymbolRelevanceSignals IndexProximate;
   IndexProximate.SymbolURI = "unittest:/foo/bar.h";
-  StringMap<SourceParams> ProxSources;
+  llvm::StringMap<SourceParams> ProxSources;
   ProxSources.try_emplace(testPath("foo/baz.h"));
   URIDistance Distance(ProxSources);
   IndexProximate.FileProximityMatch = &Distance;
@@ -272,7 +277,7 @@ TEST(QualityTests, SymbolRelevanceSignalsSanity) {
 
   SymbolRelevanceSignals Scoped;
   Scoped.Scope = SymbolRelevanceSignals::FileScope;
-  EXPECT_EQ(Scoped.evaluate(), Default.evaluate());
+  EXPECT_LT(Scoped.evaluate(), Default.evaluate());
   Scoped.Query = SymbolRelevanceSignals::CodeComplete;
   EXPECT_GT(Scoped.evaluate(), Default.evaluate());
 
@@ -345,7 +350,7 @@ TEST(QualityTests, NoBoostForClassConstructor) {
   SymbolRelevanceSignals Cls;
   Cls.merge(CodeCompletionResult(Foo, /*Priority=*/0));
 
-  const NamedDecl *CtorDecl = &findAnyDecl(AST, [](const NamedDecl &ND) {
+  const NamedDecl *CtorDecl = &findDecl(AST, [](const NamedDecl &ND) {
     return (ND.getQualifiedNameAsString() == "Foo::Foo") &&
            isa<CXXConstructorDecl>(&ND);
   });
@@ -377,7 +382,7 @@ TEST(QualityTests, IsInstanceMember) {
   Rel.merge(BarSym);
   EXPECT_TRUE(Rel.IsInstanceMember);
 
-  Rel.IsInstanceMember =false;
+  Rel.IsInstanceMember = false;
   const Symbol &TplSym = findSymbol(Symbols, "Foo::tpl");
   Rel.merge(TplSym);
   EXPECT_TRUE(Rel.IsInstanceMember);
@@ -397,29 +402,58 @@ TEST(QualityTests, IsInstanceMember) {
   EXPECT_TRUE(Rel.IsInstanceMember);
 }
 
-TEST(QualityTests, ConstructorQuality) {
+TEST(QualityTests, ConstructorDestructor) {
   auto Header = TestTU::withHeaderCode(R"cpp(
     class Foo {
     public:
       Foo(int);
+      ~Foo();
     };
   )cpp");
   auto Symbols = Header.headerSymbols();
   auto AST = Header.build();
 
-  const NamedDecl *CtorDecl = &findAnyDecl(AST, [](const NamedDecl &ND) {
+  const NamedDecl *CtorDecl = &findDecl(AST, [](const NamedDecl &ND) {
     return (ND.getQualifiedNameAsString() == "Foo::Foo") &&
            isa<CXXConstructorDecl>(&ND);
   });
+  const NamedDecl *DtorDecl = &findDecl(AST, [](const NamedDecl &ND) {
+    return (ND.getQualifiedNameAsString() == "Foo::~Foo") &&
+           isa<CXXDestructorDecl>(&ND);
+  });
 
-  SymbolQualitySignals Q;
-  Q.merge(CodeCompletionResult(CtorDecl, /*Priority=*/0));
-  EXPECT_EQ(Q.Category, SymbolQualitySignals::Constructor);
+  SymbolQualitySignals CtorQ;
+  CtorQ.merge(CodeCompletionResult(CtorDecl, /*Priority=*/0));
+  EXPECT_EQ(CtorQ.Category, SymbolQualitySignals::Constructor);
 
-  Q.Category = SymbolQualitySignals::Unknown;
+  CtorQ.Category = SymbolQualitySignals::Unknown;
   const Symbol &CtorSym = findSymbol(Symbols, "Foo::Foo");
-  Q.merge(CtorSym);
-  EXPECT_EQ(Q.Category, SymbolQualitySignals::Constructor);
+  CtorQ.merge(CtorSym);
+  EXPECT_EQ(CtorQ.Category, SymbolQualitySignals::Constructor);
+
+  SymbolQualitySignals DtorQ;
+  DtorQ.merge(CodeCompletionResult(DtorDecl, /*Priority=*/0));
+  EXPECT_EQ(DtorQ.Category, SymbolQualitySignals::Destructor);
+}
+
+TEST(QualityTests, Operator) {
+  auto Header = TestTU::withHeaderCode(R"cpp(
+    class Foo {
+    public:
+      bool operator<(const Foo& f1);
+    };
+  )cpp");
+  auto AST = Header.build();
+
+  const NamedDecl *Operator = &findDecl(AST, [](const NamedDecl &ND) {
+    if (const auto *OD = dyn_cast<FunctionDecl>(&ND))
+      if (OD->isOverloadedOperator())
+        return true;
+    return false;
+  });
+  SymbolQualitySignals Q;
+  Q.merge(CodeCompletionResult(Operator, /*Priority=*/0));
+  EXPECT_EQ(Q.Category, SymbolQualitySignals::Operator);
 }
 
 TEST(QualityTests, ItemWithFixItsRankedDown) {

@@ -1,9 +1,8 @@
 //===--- FindSymbols.h --------------------------------------*- C++-*------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -36,8 +35,7 @@ getWorkspaceSymbols(llvm::StringRef Query, int Limit,
 
 /// Retrieves the symbols contained in the "main file" section of an AST in the
 /// same order that they appear.
-llvm::Expected<std::vector<SymbolInformation>>
-getDocumentSymbols(ParsedAST &AST);
+llvm::Expected<std::vector<DocumentSymbol>> getDocumentSymbols(ParsedAST &AST);
 
 } // namespace clangd
 } // namespace clang

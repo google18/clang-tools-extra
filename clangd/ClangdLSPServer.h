@@ -1,9 +1,8 @@
 //===--- ClangdLSPServer.h - LSP server --------------------------*- C++-*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -38,7 +37,8 @@ public:
   /// for compile_commands.json in all parent directories of each file.
   /// If UseDirBasedCDB is false, compile commands are not read from disk.
   // FIXME: Clean up signature around CDBs.
-  ClangdLSPServer(Transport &Transp, const clangd::CodeCompleteOptions &CCOpts,
+  ClangdLSPServer(Transport &Transp, const FileSystemProvider &FSProvider,
+                  const clangd::CodeCompleteOptions &CCOpts,
                   llvm::Optional<Path> CompileCommandsDir, bool UseDirBasedCDB,
                   const ClangdServer::Options &Opts);
   ~ClangdLSPServer();
@@ -52,11 +52,13 @@ public:
 private:
   // Implement DiagnosticsConsumer.
   void onDiagnosticsReady(PathRef File, std::vector<Diag> Diagnostics) override;
+  void onFileUpdated(PathRef File, const TUStatus &Status) override;
 
   // LSP methods. Notifications have signature void(const Params&).
   // Calls have signature void(const Params&, Callback<Response>).
   void onInitialize(const InitializeParams &, Callback<llvm::json::Value>);
   void onShutdown(const ShutdownParams &, Callback<std::nullptr_t>);
+  void onSync(const NoParams &, Callback<std::nullptr_t>);
   void onDocumentDidOpen(const DidOpenTextDocumentParams &);
   void onDocumentDidChange(const DidChangeTextDocumentParams &);
   void onDocumentDidClose(const DidCloseTextDocumentParams &);
@@ -66,13 +68,17 @@ private:
                                  Callback<std::vector<TextEdit>>);
   void onDocumentFormatting(const DocumentFormattingParams &,
                             Callback<std::vector<TextEdit>>);
+  // The results are serialized 'vector<DocumentSymbol>' if
+  // SupportsHierarchicalDocumentSymbol is true and 'vector<SymbolInformation>'
+  // otherwise.
   void onDocumentSymbol(const DocumentSymbolParams &,
-                        Callback<std::vector<SymbolInformation>>);
+                        Callback<llvm::json::Value>);
   void onCodeAction(const CodeActionParams &, Callback<llvm::json::Value>);
-  void onCompletion(const TextDocumentPositionParams &,
-                    Callback<CompletionList>);
+  void onCompletion(const CompletionParams &, Callback<CompletionList>);
   void onSignatureHelp(const TextDocumentPositionParams &,
                        Callback<SignatureHelp>);
+  void onGoToDeclaration(const TextDocumentPositionParams &,
+                         Callback<std::vector<Location>>);
   void onGoToDefinition(const TextDocumentPositionParams &,
                         Callback<std::vector<Location>>);
   void onReference(const ReferenceParams &, Callback<std::vector<Location>>);
@@ -88,8 +94,16 @@ private:
   void onHover(const TextDocumentPositionParams &,
                Callback<llvm::Optional<Hover>>);
   void onChangeConfiguration(const DidChangeConfigurationParams &);
+  void onSymbolInfo(const TextDocumentPositionParams &,
+                    Callback<std::vector<SymbolDetails>>);
 
   std::vector<Fix> getFixes(StringRef File, const clangd::Diagnostic &D);
+
+  /// Checks if completion request should be ignored. We need this due to the
+  /// limitation of the LSP. Per LSP, a client sends requests for all "trigger
+  /// character" we specify, but for '>' and ':' we need to check they actually
+  /// produce '->' and '::', respectively.
+  bool shouldRunCompletion(const CompletionParams &Params) const;
 
   /// Forces a reparse of all currently opened files.  As a result, this method
   /// may be very expensive.  This method is normally called when the
@@ -117,7 +131,7 @@ private:
   void call(StringRef Method, llvm::json::Value Params);
   void notify(StringRef Method, llvm::json::Value Params);
 
-  RealFileSystemProvider FSProvider;
+  const FileSystemProvider &FSProvider;
   /// Options used for code completion
   clangd::CodeCompleteOptions CCOpts;
   /// Options used for diagnostics.
@@ -126,9 +140,12 @@ private:
   SymbolKindBitset SupportedSymbolKinds;
   /// The supported completion item kinds of the client.
   CompletionItemKindBitset SupportedCompletionItemKinds;
-  // Whether the client supports CodeAction response objects.
+  /// Whether the client supports CodeAction response objects.
   bool SupportsCodeAction = false;
-
+  /// From capabilities of textDocument/documentSymbol.
+  bool SupportsHierarchicalDocumentSymbol = false;
+  /// Whether the client supports showing file status.
+  bool SupportFileStatus = false;
   // Store of the current versions of the open documents.
   DraftStore DraftMgr;
 

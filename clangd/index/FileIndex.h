@@ -1,9 +1,8 @@
 //===--- FileIndex.h - Index for files. ---------------------------- C++-*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -20,6 +19,7 @@
 #include "Index.h"
 #include "MemIndex.h"
 #include "Merge.h"
+#include "index/CanonicalIncludes.h"
 #include "clang/Lex/Preprocessor.h"
 #include <memory>
 
@@ -32,6 +32,14 @@ enum class IndexType {
   Light,
   // Dex is relatively expensive to build and uses more memory, but is fast.
   Heavy,
+};
+
+/// How to handle duplicated symbols across multiple files.
+enum class DuplicateHandling {
+  // Pick a random symbol. Less accurate but faster.
+  PickOne,
+  // Merge symbols. More accurate but slower.
+  Merge,
 };
 
 /// A container of Symbols from several source files. It can be updated
@@ -56,7 +64,8 @@ public:
 
   // The index keeps the symbols alive.
   std::unique_ptr<SymbolIndex>
-  buildIndex(IndexType, ArrayRef<std::string> URISchemes = {});
+  buildIndex(IndexType,
+             DuplicateHandling DuplicateHandle = DuplicateHandling::PickOne);
 
 private:
   mutable std::mutex Mutex;
@@ -71,14 +80,13 @@ private:
 /// FIXME: Expose an interface to remove files that are closed.
 class FileIndex : public MergedIndex {
 public:
-  /// If URISchemes is empty, the default schemes in SymbolCollector will be
-  /// used.
-  FileIndex(std::vector<std::string> URISchemes = {}, bool UseDex = true);
+  FileIndex(bool UseDex = true);
 
   /// Update preamble symbols of file \p Path with all declarations in \p AST
   /// and macros in \p PP.
   void updatePreamble(PathRef Path, ASTContext &AST,
-                      std::shared_ptr<Preprocessor> PP);
+                      std::shared_ptr<Preprocessor> PP,
+                      const CanonicalIncludes &Includes);
 
   /// Update symbols and references from main file \p Path with
   /// `indexMainDecls`.
@@ -86,7 +94,6 @@ public:
 
 private:
   bool UseDex; // FIXME: this should be always on.
-  std::vector<std::string> URISchemes;
 
   // Contains information from each file's preamble only.
   // These are large, but update fairly infrequently (preambles are stable).
@@ -115,15 +122,12 @@ private:
 /// Retrieves symbols and refs of local top level decls in \p AST (i.e.
 /// `AST.getLocalTopLevelDecls()`).
 /// Exposed to assist in unit tests.
-/// If URISchemes is empty, the default schemes in SymbolCollector will be used.
-std::pair<SymbolSlab, RefSlab>
-indexMainDecls(ParsedAST &AST, llvm::ArrayRef<std::string> URISchemes = {});
+std::pair<SymbolSlab, RefSlab> indexMainDecls(ParsedAST &AST);
 
 /// Idex declarations from \p AST and macros from \p PP that are declared in
 /// included headers.
-/// If URISchemes is empty, the default schemes in SymbolCollector will be used.
 SymbolSlab indexHeaderSymbols(ASTContext &AST, std::shared_ptr<Preprocessor> PP,
-                              llvm::ArrayRef<std::string> URISchemes = {});
+                              const CanonicalIncludes &Includes);
 
 } // namespace clangd
 } // namespace clang
