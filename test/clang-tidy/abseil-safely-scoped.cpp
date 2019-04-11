@@ -12,7 +12,7 @@ void f(A a);
 
 namespace {} // anonymous namespace
 } // namespace foo1
-// CHECK-MESSAGES: :[[@LINE-4]]:12: warning: using declaration 'A' not
+// CHECK-MESSAGES: :[[@LINE-5]]:12: warning: using declaration 'A' not
 // declared in the innermost namespace. [abseil-safely-scoped]
 
 namespace foo2 {
