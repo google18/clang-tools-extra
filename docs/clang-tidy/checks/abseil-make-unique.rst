@@ -5,5 +5,18 @@
 abseil-make-unique
 ==================
 
-The abseil-make-unique check is an alias, please see
-`modernize-make-unique <modernize-make-unique.html>`_ for more information.
+This check finds the creation of ``std::unique_ptr`` objects by explicitly
+calling the constructor and a ``new`` expression, and replaces it with a call
+to ``absl::make_unique``, the Abseil implementation of ``std::make_unique`` 
+in C++11.
+
+.. code-block:: c++
+
+  auto ptr = std::unique_ptr<int>(new int(1));
+
+  // becomes
+
+  auto ptr = absl::make_unique<int>(1);
+
+The Abseil Style Guide <https://abseil.io/tips/126>_ discusses this issue in
+more detail.

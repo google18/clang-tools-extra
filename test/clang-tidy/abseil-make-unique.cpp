@@ -1,33 +1,9 @@
 // RUN: %check_clang_tidy %s abseil-make-unique %t -- -- -std=c++11 \
+// RUN:   -I%S/Inputs/modernize-smart-ptr
 
-namespace std {
-
-template <typename T>
-class default_delete {};
-
-template <typename type, typename Deleter = std::default_delete<type>>
-class unique_ptr {
-public:
-  unique_ptr() {}
-  unique_ptr(type *ptr) {}
-  unique_ptr(const unique_ptr<type> &t) = delete;
-  unique_ptr(unique_ptr<type> &&t) {}
-  ~unique_ptr() {}
-  type &operator*() { return *ptr; }
-  type *operator->() { return ptr; }
-  type *release() { return ptr; }
-  void reset() {}
-  void reset(type *pt) {}
-  void reset(type pt) {}
-  unique_ptr &operator=(unique_ptr &&) { return *this; }
-  template <typename T>
-  unique_ptr &operator=(unique_ptr<T> &&) { return *this; }
-
-private:
-  type *ptr;
-};
-
-}  // namespace std
+#include "unique_ptr.h"
+#include "initializer_list.h"
+// CHECK-FIXES: #include "absl/memory/memory.h"
 
 class A {
  int x;
@@ -35,6 +11,11 @@ class A {
 
  public:
    A(int _x, int _y): x(_x), y(_y) {}
+};
+
+struct B {
+  B(std::initializer_list<int>);
+  B();
 };
 
 struct Base {
@@ -46,7 +27,7 @@ struct Derived : public Base {
 };
 
 int* returnPointer();
-void expectPointer(std::unique_ptr<int> p);
+void expectPointer(std::unique_ptr<int>);
 
 std::unique_ptr<int> makeAndReturnPointer() {
   return std::unique_ptr<int>(new int(0));
@@ -124,4 +105,8 @@ void Negatives() {
 
   // Only replace if the template type is same as new type
   auto Pderived = std::unique_ptr<Base>(new Derived());
+
+  // Ignore initializer-list constructors
+  std::unique_ptr<B> PInit = std::unique_ptr<B>(new B{1, 2});
+  PInit.reset(new B{1, 2});
 }

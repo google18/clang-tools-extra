@@ -39,20 +39,6 @@ std::string GetNewExprName(const CXXNewExpr *NewExpr,
 
 } // namespace
 
-namespace {
-
-AST_MATCHER_P(CXXNewExpr, hasInitializationStyle,
-              CXXNewExpr::InitializationStyle, IS) {
-  return Node.getInitializationStyle() == IS;
-};
-
-AST_POLYMORPHIC_MATCHER_P(boolean, AST_POLYMORPHIC_SUPPORTED_TYPES(Stmt, Decl),
-                          bool, Boolean) {
-  return Boolean;
-}
-
-} // namespace
-
 const char MakeSmartPtrCheck::PointerType[] = "pointerType";
 
 MakeSmartPtrCheck::MakeSmartPtrCheck(StringRef Name,
@@ -105,10 +91,7 @@ void MakeSmartPtrCheck::registerMatchers(ast_matchers::MatchFinder *Finder) {
               hasArgument(0,
                           cxxNewExpr(hasType(pointsTo(qualType(hasCanonicalType(
                                          equalsBoundNode(PointerType))))),
-                                     CanCallCtor,
-                                     anyOf(unless(boolean(IgnoreListInit)),
-                                           unless(hasInitializationStyle(
-                                               CXXNewExpr::ListInit))))
+                                     CanCallCtor)
                               .bind(NewExpression)),
               unless(isInTemplateInstantiation()))
               .bind(ConstructorCall)))),
@@ -119,10 +102,7 @@ void MakeSmartPtrCheck::registerMatchers(ast_matchers::MatchFinder *Finder) {
           thisPointerType(getSmartPointerTypeMatcher()),
           callee(cxxMethodDecl(hasName("reset"))),
           hasArgument(
-              0, cxxNewExpr(CanCallCtor, anyOf(unless(boolean(IgnoreListInit)),
-                                               unless(hasInitializationStyle(
-                                                   CXXNewExpr::ListInit))))
-                     .bind(NewExpression)),
+              0, cxxNewExpr(CanCallCtor).bind(NewExpression)),
           unless(isInTemplateInstantiation()))
           .bind(ResetCall),
       this);
@@ -144,6 +124,9 @@ void MakeSmartPtrCheck::check(const MatchFinder::MatchResult &Result) {
     return;
   // Skip when this is a new-expression with `auto`, e.g. new auto(1)
   if (New->getType()->getPointeeType()->getContainedAutoType())
+    return;
+
+  if (IgnoreListInit && New->getInitializationStyle() == CXXNewExpr::ListInit)
     return;
 
   // Be conservative for cases where we construct an array without any
