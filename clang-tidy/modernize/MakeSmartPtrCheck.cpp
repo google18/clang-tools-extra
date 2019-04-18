@@ -101,8 +101,7 @@ void MakeSmartPtrCheck::registerMatchers(ast_matchers::MatchFinder *Finder) {
       cxxMemberCallExpr(
           thisPointerType(getSmartPointerTypeMatcher()),
           callee(cxxMethodDecl(hasName("reset"))),
-          hasArgument(
-              0, cxxNewExpr(CanCallCtor).bind(NewExpression)),
+          hasArgument(0, cxxNewExpr(CanCallCtor).bind(NewExpression)),
           unless(isInTemplateInstantiation()))
           .bind(ResetCall),
       this);
