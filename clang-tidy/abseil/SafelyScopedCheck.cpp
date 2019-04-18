@@ -34,7 +34,9 @@ void SafelyScopedCheck::registerMatchers(MatchFinder *Finder) {
 void SafelyScopedCheck::check(const MatchFinder::MatchResult &Result) {
   const auto *MatchedDecl = Result.Nodes.getNodeAs<UsingDecl>("use");
   diag(MatchedDecl->getLocation(),
-       "using declaration %0 not declared in the innermost namespace.")
+       "using declaration %0 is not declared in the innermost namespace. "
+       "Use discretion when moving using declarations as it might "
+       "necessitate moving lines containing relevant aliases.")
       << MatchedDecl;
 }
 
