@@ -18,19 +18,22 @@ namespace tidy {
 namespace modernize {
 
 void UseAutoForRangeCheck::registerMatchers(MatchFinder *Finder) {
-  Finder->addMatcher(cxxForRangeStmt(hasLoopVariable(varDecl().bind("LoopVar")))
-                         .bind("loopInit"),
-                     this);
+  Finder->addMatcher(cxxForRangeStmt(
+          hasLoopVariable(varDecl().bind("loopVar")),
+          hasRangeInit(declRefExpr(hasType(
+              cxxRecordDecl(hasName("::std::map")).bind("loopRange"))))))
+      .bind("loopInit")
 }
 
 void UseAutoForRangeCheck::check(const MatchFinder::MatchResult &Result) {
   const auto *RangeLoop = Result.Nodes.getNodeAs<CXXForRangeStmt>("loopInit");
-  llvm::outs() << "test\n";
-
   if (RangeLoop) {
-    const auto *LoopVar = Result.Nodes.getNodeAs<VarDecl>("LoopVar");
-    if (LoopVar) {
-      std::string DiagText = "Prefer auto in range based loop variable";
+    const auto *LoopRange = Result.Nodes.getNodeAs<CXXRecordDecl>("loopRange");
+    const auto *LoopVar = Result.Nodes.getNodeAs<VarDecl>("loopVar");
+    if (LoopRange && LoopVar) {
+      auto VarType = LoopVar->getType();
+      std::string DiagText =
+          "Prefer auto in range based loop over map object";
       std::string NewText = "auto " + LoopVar->getNameAsString();
       SourceLocation Target = LoopVar->getBeginLoc();
       diag(Target, DiagText) << FixItHint::CreateReplacement(
