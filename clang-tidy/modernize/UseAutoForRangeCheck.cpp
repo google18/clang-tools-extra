@@ -19,10 +19,10 @@ namespace modernize {
 
 void UseAutoForRangeCheck::registerMatchers(MatchFinder *Finder) {
   Finder->addMatcher(cxxForRangeStmt(
-          hasLoopVariable(varDecl().bind("loopVar")),
+          hasLoopVariable(varDecl(unless(hasType(autoType()))).bind("loopVar")),
           hasRangeInit(declRefExpr(hasType(
-              cxxRecordDecl(hasName("::std::map")).bind("loopRange"))))))
-      .bind("loopInit")
+              cxxRecordDecl(hasName("::std::map")).bind("loopRange")))))
+      .bind("loopInit"),this);
 }
 
 void UseAutoForRangeCheck::check(const MatchFinder::MatchResult &Result) {
@@ -31,14 +31,18 @@ void UseAutoForRangeCheck::check(const MatchFinder::MatchResult &Result) {
     const auto *LoopRange = Result.Nodes.getNodeAs<CXXRecordDecl>("loopRange");
     const auto *LoopVar = Result.Nodes.getNodeAs<VarDecl>("loopVar");
     if (LoopRange && LoopVar) {
-      auto VarType = LoopVar->getType();
-      std::string DiagText =
-          "Prefer auto in range based loop over map object";
-      std::string NewText = "auto " + LoopVar->getNameAsString();
-      SourceLocation Target = LoopVar->getBeginLoc();
-      diag(Target, DiagText) << FixItHint::CreateReplacement(
-          CharSourceRange::getTokenRange(Target, LoopVar->getEndLoc()),
-          NewText);
+      //need to check if the type is not auto
+        auto VarType = LoopVar->getType();
+        llvm::outs() << VarType.getAsString() << "\n";
+        if(VarType.getAsString() != "auto"){ 
+        std::string DiagText =
+            "Prefer auto in range based loop over map object";
+        std::string NewText = "auto " + LoopVar->getNameAsString();
+        SourceLocation Target = LoopVar->getBeginLoc();
+        diag(Target, DiagText) << FixItHint::CreateReplacement(
+            CharSourceRange::getTokenRange(Target, LoopVar->getEndLoc()),
+            NewText);
+      }
     }
   }
 }
