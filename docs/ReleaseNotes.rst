@@ -91,19 +91,18 @@ Improvements to clang-tidy
   Finds and fixes ``absl::Time`` subtraction expressions to do subtraction
   in the Time domain instead of the numeric domain.
 
-- New :doc:`abseil-wrap-unique
-  <clang-tidy/checks/abseil-wrap-unique>` check.
-
-  Looks for instances of factory functions which uses a non-public constructor
-  that returns a ``std::unqiue_ptr<T>`` then recommends using 
-  ``absl::wrap_unique(new T(...))``.
-
 - New :doc:`google-readability-avoid-underscore-in-googletest-name
   <clang-tidy/checks/google-readability-avoid-underscore-in-googletest-name>`
   check.
 
   Checks whether there are underscores in googletest test and test case names in
   test macros, which is prohibited by the Googletest FAQ.
+
+- New :doc: `modernize-use-auto-for-range
+  <clang-tidy/checks/modernize-use-auto-for-range>`
+
+  Check suggests using ``auto`` type specifier with variable declarations within
+  range based loops.
 
 - The :doc:`bugprone-argument-comment
   <clang-tidy/checks/bugprone-argument-comment>` now supports

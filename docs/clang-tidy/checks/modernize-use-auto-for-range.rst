@@ -3,7 +3,7 @@
 modernize-use-auto-for-range
 ============================
 
-This check suggest using ``auto`` type specifier on variable declartion within
+Check suggests using ``auto`` type specifier on variable declartion within
 range based loops. Type specifier ``auto`` will automatically deduce the type
 as being ``std::pair<const KeyValue, ValueType>`` as opposed to the often assumed
 ``std::pair<KeyType, ValueType>``.
