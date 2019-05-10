@@ -18,11 +18,17 @@ namespace tidy {
 namespace modernize {
 
 void UseAutoForRangeCheck::registerMatchers(MatchFinder *Finder) {
-  Finder->addMatcher(cxxForRangeStmt(
+  Finder->addMatcher(
+      cxxForRangeStmt(
           hasLoopVariable(varDecl(unless(hasType(autoType()))).bind("loopVar")),
-          hasRangeInit(declRefExpr(hasType(
-              cxxRecordDecl(hasName("::std::map")).bind("loopRange")))))
-      .bind("loopInit"),this);
+          hasRangeInit(declRefExpr(
+              hasType(cxxRecordDecl(anyOf(hasName("::std::map"),
+                                          hasName("::std::unordered_map"),
+                                          hasName("::std::multimap"),
+                                          hasName("::std::unordered_multimap")))
+                          .bind("loopRange")))))
+          .bind("loopInit"),
+      this);
 }
 
 void UseAutoForRangeCheck::check(const MatchFinder::MatchResult &Result) {
@@ -31,10 +37,10 @@ void UseAutoForRangeCheck::check(const MatchFinder::MatchResult &Result) {
     const auto *LoopRange = Result.Nodes.getNodeAs<CXXRecordDecl>("loopRange");
     const auto *LoopVar = Result.Nodes.getNodeAs<VarDecl>("loopVar");
     if (LoopRange && LoopVar) {
-      //need to check if the type is not auto
-        auto VarType = LoopVar->getType();
-        llvm::outs() << VarType.getAsString() << "\n";
-        if(VarType.getAsString() != "auto"){ 
+      // need to check if the type is not auto
+      auto VarType = LoopVar->getType();
+      llvm::outs() << VarType.getAsString() << "\n";
+      if (VarType.getAsString() != "auto") {
         std::string DiagText =
             "Prefer auto in range based loop over map object";
         std::string NewText = "auto " + LoopVar->getNameAsString();

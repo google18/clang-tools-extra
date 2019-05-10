@@ -52,12 +52,8 @@ struct C {
   int x;
   int y;
 };
-/*
-std::unique_ptr<A> returnPointer() {
-  return std::unique_ptr<A>(A::NewA());
-}
-*/
-void positives() {
+
+`void positives() {
   std::unique_ptr<A> a;
   a.reset(A::NewA());
   //CHECK-MESSAGE: :[[@LINE-1]]:3: warning: prefer absl::WrapUnique for resetting unique_ptr [abseil-wrap-unique]
